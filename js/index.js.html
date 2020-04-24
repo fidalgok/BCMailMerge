@@ -1,0 +1,1198 @@
+<script>
+  // generates a unique ID to store with mail merges
+  function uuid(a) {
+    return a
+      ? (a ^ ((Math.random() * 16) >> (a / 4))).toString(16)
+      : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, uuid);
+  }
+
+  (function () {
+    // set up some state for the app
+    const appState = {
+      currentMerge: {
+        mergetitle: "",
+        draftId: "",
+        mergeId: "",
+        customAttachment: {
+          type: "slide",
+          includeAttachment: "no",
+          templateId: "",
+        },
+      },
+      merges: [], // a list of merges created by user selecting
+      // a draft and entering a merge title.
+      drafts: [], // a list of drafts in users Gmail drafts
+      mergeConditions: [],
+      columnHeadings: [],
+      currentPage: 0,
+      pages: ["start-page", "initial-ui", "conditions", "preview"], // dictates how you progress through the screens
+    };
+
+    appState.draftForm = document.querySelector("#draft-email");
+    const previewContent = document.getElementById(".preview__output");
+
+    /*!
+     * Serialize all form data into a query string
+     * (c) 2018 Chris Ferdinandi, MIT License, https://gomakethings.com
+     * @param  {Node}   form The form to serialize
+     * @return {String}      The serialized form data
+     */
+    const formToObject = function (form) {
+      // Setup our serialized data
+      const formObject = {};
+
+      // Loop through each field in the form
+      for (let i = 0; i < form.elements.length; i++) {
+        const field = form.elements[i];
+
+        // Don't serialize fields without a name, submits, buttons, file and reset inputs, and disabled fields
+        if (
+          !field.name ||
+          field.disabled ||
+          field.type === "file" ||
+          field.type === "reset" ||
+          field.type === "submit" ||
+          field.type === "button"
+        )
+          continue;
+
+        // If a multi-select, get all selections
+        if (field.type === "select-multiple") {
+          for (let n = 0; n < field.options.length; n++) {
+            if (!field.options[n].selected) continue;
+            formObject[field.name] = field.options[n].value;
+          }
+        }
+
+        // Convert field data to a query string
+        else if (
+          (field.type !== "checkbox" && field.type !== "radio") ||
+          field.checked
+        ) {
+          formObject[field.name] = field.value;
+        }
+      }
+      return formObject;
+    };
+
+    function validateEmails(emails) {
+      const regex = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+
+      const invalidEmails = emails
+        .split(",")
+        .map(function (email) {
+          return email.trim();
+        })
+        .filter(function (email) {
+          if (email.indexOf(`<<${appState.currentMerge.recipients}>>`) !== -1)
+            return false;
+          return !email.match(regex);
+        });
+
+      if (invalidEmails.length) {
+        if (
+          invalidEmails[invalidEmails.length - 1] === "" &&
+          invalidEmails.length === 1
+        ) {
+          // covers trailing comma case
+          return;
+        }
+        return `These emails are invalid ${invalidEmails.join(", ")}`;
+      }
+    }
+
+    function last(array) {
+      return array[array.length - 1];
+    }
+
+    function validateForm(form) {
+      const fields = [...form.elements];
+
+      return validateFields(fields);
+    }
+
+    function validateFields(fields) {
+      const errors = {};
+      // check for invalid emails
+      fields.forEach((field) => {
+        if (
+          !field.name ||
+          field.disabled ||
+          field.type === "file" ||
+          field.type === "reset" ||
+          field.type === "submit" ||
+          field.type === "button"
+        )
+          return;
+
+        if (field.name == "to" || field.name == "cc" || field.name == "bcc") {
+          const invalidEmails = validateEmails(field.value);
+          if (invalidEmails) errors[field.name] = invalidEmails;
+        }
+        // check for required fields recipients, userdraft, mergetitle
+        if (
+          field.name === "subject" ||
+          field.name === "body" ||
+          field.name === "recipients" ||
+          field.name === "mergetitle" ||
+          field.name === "userdrafts"
+        ) {
+          if (field.value.trim() === "") {
+            errors[field.name] = "This field is required";
+          }
+        }
+      });
+      if (fields.length === 1 && fields[0].name === "mergetitle") {
+        // need to account for case when other fields are updated individually
+        // was calling this multiple times causing a visual bug in the UI
+        const mergeTitleFound = fields.find(
+          (field) => field.name === "mergetitle"
+        );
+        if (!mergeTitleFound) errors.mergetitle = "This field is required";
+      }
+
+      return errors;
+    }
+
+    function attachButtonListeners(button) {
+      button.addEventListener("click", (e) => {
+        // if button for completing merge was clicked run the merge
+        if (
+          e.currentTarget.dataset &&
+          e.currentTarget.dataset.next === "preview"
+        ) {
+          const previewContent = document.querySelector(".preview__output");
+          previewContent.innerHTML = "";
+          sendMerge("preview");
+        }
+        if (
+          e.currentTarget.dataset &&
+          e.currentTarget.dataset.next === "merge"
+        ) {
+          sendMerge("merge");
+        }
+
+        handleTransition(button.dataset.current, button.dataset.next);
+        if (e.target.matches('[class$="previous"]')) {
+          handleLoading(button.dataset.next, "cancel");
+        } else {
+          handleLoading(button.dataset.next);
+        }
+        if (
+          e.currentTarget.dataset &&
+          e.currentTarget.dataset.next === "attachments"
+        ) {
+          initAttachmentUI();
+        }
+      });
+    }
+
+    // #region Button Event Listeners
+    const previewButtons = document.querySelectorAll("#preview button");
+    previewButtons.forEach((button) =>
+      button.addEventListener("click", (e) => {
+        handleTransition(button.dataset.current, button.dataset.next);
+        if (e.target.matches('[class$="previous"]')) {
+          handleLoading(button.dataset.next, "cancel");
+        } else {
+          handleLoading(button.dataset.next);
+        }
+        // if button for completing merge was clicked run the merge
+        if (e.currentTarget.classList.contains("preview__action--next")) {
+          sendMerge("merge");
+        }
+      })
+    );
+
+    const startButton = document.getElementById("configure-merge-info");
+    startButton.addEventListener("click", (e) => {
+      handleTransition(startButton.dataset.current, startButton.dataset.next);
+      if (!appState.drafts.length) handleLoading("initial-ui");
+    });
+
+    const conditionButtons = document.querySelectorAll(
+      ".conditions__action button"
+    );
+    conditionButtons.forEach(attachButtonListeners);
+
+    const customAttachmentButtons = document.querySelectorAll(
+      ".attachments__action button"
+    );
+    customAttachmentButtons.forEach(attachButtonListeners);
+
+    // #endregion
+    function sendMerge(kind) {
+      // collect the data to send
+      if (kind === "preview") {
+        // console.log(appState)
+        google.script.run
+          .withSuccessHandler(showPreviewUI)
+          .startStandardMerge(
+            appState.email,
+            "preview",
+            appState.currentMerge.mergetype,
+            appState.currentMerge.recipients,
+            appState.currentMerge.mergetitle,
+            appState.mergeConditions
+          );
+      } else if (kind === "merge") {
+        const attachment =
+          appState.currentMerge.customAttachment &&
+          appState.currentMerge.customAttachment.includeAttachment === "yes"
+            ? {
+                templateId: appState.currentMerge.customAttachment.templateId,
+                type: appState.currentMerge.customAttachment.type,
+              }
+            : false;
+        google.script.run
+          .withSuccessHandler(showConfirmationUI)
+          .startStandardMerge(
+            appState.email,
+            "merge",
+            appState.currentMerge.mergetype,
+            appState.currentMerge.recipients,
+            appState.currentMerge.mergetitle,
+            appState.mergeConditions,
+            attachment
+          );
+      }
+    }
+
+    function logScriptCache(data) {
+      // temporary code to test dataStorage
+      // console.log('data from scriptCache')
+      // console.log({ ...data, merges: JSON.parse(data.merges), currentMerge: JSON.parse(data.currentMerge) });
+    }
+
+    function handleInput(e) {
+      const parent = e.target.parentElement;
+      const hasError = parent.querySelector(".message__error");
+      // have to do some weird stuff to handle the mergetitle case...
+      if (e.target.name === "mergetitle") {
+        const mergeTitleError = document.querySelector(
+          ".form__section.merge-title .message__error"
+        );
+        if (mergeTitleError) {
+          mergeTitleError.parentElement.removeChild(mergeTitleError);
+        }
+      }
+      if (hasError && e.target.name !== "mergetitle") {
+        parent.removeChild(hasError);
+      }
+      const errors = Object.entries(validateFields([e.target]));
+      const formErrors = Object.entries(validateForm(appState.draftForm));
+
+      totalFormErrorsAlert(formErrors);
+
+      if (errors.length) {
+        errorMessage(errors);
+      }
+    }
+
+    function handleChange(e) {
+      const parent = e.target.parentElement;
+      const hasError = parent.querySelector(".message__error");
+
+      if (e && e.target.id === "userdrafts") {
+        if (hasError) {
+          appState.currentMerge.draftId = null;
+          updateDraftPreview();
+          return;
+        }
+        appState.currentMerge.draftId =
+          e.target.selectedOptions[0].dataset.mergeid;
+        google.script.run.withSuccessHandler(logScriptCache).storeMailMerge({
+          currentMerge: JSON.stringify(appState.currentMerge),
+        });
+        updateDraftPreview();
+        return;
+      }
+      if (hasError) return;
+      appState.currentMerge[e.target.name] = e.target.value;
+      google.script.run.withSuccessHandler(logScriptCache).storeMailMerge({
+        currentMerge: JSON.stringify(appState.currentMerge),
+      });
+    }
+
+    /*
+     *
+     * Set up the form's event listeners
+     *
+     */
+    // #region form event listeners
+
+    const form = document.querySelector("form");
+
+    const formInputs = form.querySelectorAll("input");
+    const formSelects = form.querySelectorAll("select");
+    const mergeJobsButton = document.getElementById("merge-jobs");
+    const createJobButton = document.getElementById("new-merge");
+    const refreshDraftsButton = document.getElementById("refresh-drafts");
+    formSelects.forEach((input) => {
+      input.addEventListener("input", handleInput);
+      input.addEventListener("change", handleChange);
+    });
+    formInputs.forEach((input) => {
+      if (input.name) {
+        input.addEventListener("input", handleInput);
+        input.addEventListener("change", handleChange);
+      }
+    });
+    mergeJobsButton.addEventListener("click", showMergeTitles);
+    createJobButton.addEventListener("click", showMergeTitles);
+    // sending true for the refresh event so we don't clear our form with cached data later in the process
+    refreshDraftsButton.addEventListener("click", function handleDraftsRefresh(
+      e
+    ) {
+      this.setAttribute("data-loading", "true");
+      this.querySelector(".button-text").innerText = "Refreshing Drafts";
+      this.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(updateDraftMessages)
+        .getUserDrafts(true);
+    });
+    // #endregion
+    function showMergeTitles(e) {
+      const inputGroup = document.querySelector(
+        ".form__input-group.merge-title"
+      );
+
+      if (!e || e.target.id === "merge-jobs") {
+        // check to see if there are any merges started
+        if (!appState.mergeTitles || !appState.mergeTitles.length) {
+          // nothing to show here
+          inputGroup.innerHTML = `
+            <div class="form-info">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="form-icon icon-information"><path class="primary" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20z"></path><path class="secondary" d="M11 12a1 1 0 0 1 0-2h2a1 1 0 0 1 .96 1.27L12.33 17H13a1 1 0 0 1 0 2h-2a1 1 0 0 1-.96-1.27L11.67 12H11zm2-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"></path></svg>
+              <span>Looks like there aren't any stored merge titles. Click the create new merge button to get started with a new merge job.<span></div>
+          `;
+          return;
+        }
+        // create a select with options for all merge jobs
+        const select = document.createElement("select");
+        const defaultOption = document.createElement("option");
+        defaultOption.text = "Select a merge title";
+        defaultOption.value = "";
+        select.add(defaultOption);
+
+        appState.mergeTitles.forEach((title) => {
+          const option = document.createElement("option");
+          option.text = title.slice(15);
+          option.value = title.slice(15);
+          select.add(option);
+        });
+        select.name = "mergetitle";
+        select.id = "mergetitle";
+        inputGroup.innerHTML = "";
+        inputGroup.appendChild(select);
+        inputGroup.insertAdjacentHTML(
+          "beforeend",
+          `
+        <label for="mergetitle">Select A Merge Title</label>
+        `
+        );
+        // set up event listeners for newly created input
+        select.addEventListener("input", handleInput);
+        select.addEventListener("change", handleChange);
+        // if merge title exists in appState.currentMerge, set it to the selected option
+        if (appState.currentMerge.mergetitle) {
+          const option = [...select.options].find(
+            (option) => option.value === appState.currentMerge.mergetitle
+          );
+          if (option) option.selected = true;
+        }
+      } else if (e && e.target.id === "new-merge") {
+        const html = `
+        <input type="text" name="mergetitle" id="mergetitle" placeholder="Enter a merge title">
+            <label for="mergetitle">Create Merge Title</label>
+        `;
+        inputGroup.innerHTML = html;
+        const input = inputGroup.querySelector("input");
+        input.addEventListener("input", handleInput);
+        input.addEventListener("change", handleChange);
+      }
+      appState.draftForm = document.querySelector("#draft-email");
+    }
+
+    // check script cache to see if any merge data has been saved which kicks off
+    // process of setting up the application.
+
+    google.script.run.withSuccessHandler(initApp).checkEmailColumn();
+    google.script.run.withSuccessHandler(updateAliases).getAliases();
+    google.script.run.withSuccessHandler(updateDraftMessages).getUserDrafts();
+
+    function initApp([data]) {
+      // need to check merges array for headers starting with merge status
+      const headings = data.filter(
+        (header) => !header.startsWith("Merge Status - ")
+      );
+      const mergeTitles = data.filter((header) =>
+        header.startsWith("Merge Status - ")
+      );
+      appState.mergeTitles = mergeTitles;
+      appState.columnHeadings = headings;
+      updatePlaceholders(headings);
+      updateRecipients(headings);
+    }
+
+    function updatePlaceholders(headings) {
+      const previewContent = document.getElementById("merge-placeholders");
+      const html = headings
+        .map((heading) => `<p>&lt;&lt;${heading}&gt;&gt;</p>`)
+        .join("");
+      previewContent.insertAdjacentHTML("beforeend", html);
+    }
+
+    function updateRecipients(headings) {
+      const recipientsSelect = document.querySelector("#recipients");
+      headings.forEach((heading) => {
+        const option = document.createElement("option");
+        option.text = heading;
+        option.value = heading;
+        if (heading.toLowerCase().match("email")) {
+          appState.currentMerge.recipients = heading;
+          option.selected = true;
+        }
+        recipientsSelect.add(option);
+      });
+    }
+
+    function updateAliases({ aliases }) {
+      const aliasSelect = document.querySelector("#alias");
+      aliases.forEach((alias) => {
+        const option = document.createElement("option");
+        option.text = alias;
+        option.value = alias;
+        aliasSelect.add(option);
+      });
+    }
+
+    function updateDraftMessages({ drafts, error, refresh }) {
+      handleLoading(null, "cancel");
+      if (error) {
+        console.error(error.message);
+        console.error(error.stack);
+        return;
+      }
+      appState.drafts = drafts;
+      const draftSelect = document.querySelector("#userdrafts");
+
+      // remove all options also handles refresh case
+      Array.from(draftSelect.options).forEach((option, i) => {
+        draftSelect.remove(0);
+      });
+      // create the first empty option for selecting drafts
+      const option = document.createElement("option");
+      option.text = drafts.length ? "Select Draft" : "No drafts found";
+      option.value = "";
+      draftSelect.add(option);
+
+      // create options for each draft found in user drafts
+      drafts.forEach((draft, idx) => {
+        const option = document.createElement("option");
+        option.text = draft.subject || `No subject for draft ${idx + 1}`;
+        option.value = draft.subject || `No subject for draft ${idx + 1}`;
+        option.setAttribute("data-mergeid", draft.id);
+        draftSelect.add(option);
+      });
+      // should have all data now to set up the form... don't refresh everything if user is just refreshing drafts
+      if (!refresh)
+        google.script.run
+          .withSuccessHandler(updateFormWithCachedData)
+          .getMailMerge();
+      if (refresh) {
+        // reselect the current draft if one was selected before
+        const el = document.querySelector(
+          `[data-mergeId="${appState.currentMerge.draftId}"]`
+        );
+        if (el) {
+          el.selected = true;
+          updateDraftPreview();
+        }
+        // update the loading state of the button
+        refreshDraftsButton.setAttribute("data-loading", "false");
+        refreshDraftsButton.querySelector(".button-text").innerText =
+          "Refresh Drafts";
+        refreshDraftsButton.disabled = false;
+      }
+    }
+
+    function updateDraftPreview() {
+      const draft = appState.drafts.find(
+        (draft) => draft.id === appState.currentMerge.draftId
+      );
+      if (!draft) {
+        // clear out the preview if the draft wasn't found
+        const draftPreview = [
+          ...document
+            .getElementById("draft-preview")
+            .querySelectorAll('[class$="content"]'),
+        ];
+        draftPreview.forEach((el) => (el.innerHTML = ""));
+        return;
+      }
+
+      const attachmentNames = draft.attachments;
+
+      const draftPreview = [
+        ...document
+          .getElementById("draft-preview")
+          .querySelectorAll('[class$="content"]'),
+      ];
+
+      draftPreview.forEach((el) => {
+        // add the draft info to each div
+        if (el.matches(".attachments__content")) {
+          el.innerHTML = `
+            ${attachmentNames.join(", ")}
+          `;
+          return;
+        }
+        if (el.matches(".body__content")) {
+          el.innerHTML = draft.body;
+          return;
+        }
+
+        const field = el.classList
+          .item(0)
+          .slice(0, el.classList.item(0).indexOf("__"));
+        el.innerText = draft[field];
+      });
+    }
+
+    function updateFormWithCachedData({ error, data }, form) {
+      if (error) return console.error(error);
+      if (typeof data.merges === "string") {
+        // checking for data from google backend, have to parse some JSON first
+        // otherwise data coming in is as I expect it
+        appState.merges = data.merges ? JSON.parse(data.merges) : [];
+        appState.currentMerge = data.currentMerge
+          ? JSON.parse(data.currentMerge)
+          : {};
+        appState.currentMerge.attachments =
+          data.currentMerge && data.currentMerge.attachments
+            ? JSON.parse(data.currentMerge.attachments)
+            : [];
+      }
+      // check for stored merges array and that it has data in it
+      if (
+        appState.merges &&
+        appState.merges.length &&
+        typeof appState.merges !== "string"
+      ) {
+        const merge = appState.merges.filter(
+          (el) =>
+            // find the current merge
+            el.mergeId === appState.currentMerge.mergeId
+        );
+
+        if (merge && merge.length && merge[0].fields) {
+          for (field in merge[0].fields) {
+            const el = document.querySelector(
+              `[name="${field.toLowerCase()}"]`
+            );
+            if (!el) continue;
+            if (el.type === "radio") {
+              document.querySelector(
+                `#${merge[0].fields[field]}`
+              ).checked = true;
+              // el.checked = true;
+              continue;
+            }
+
+            el.value = merge[0].fields[field];
+          }
+        }
+      }
+      if (appState.currentMerge.draftId) {
+        // create the select for drafts and set the selected option of the draftId from the last run merge
+        showMergeTitles();
+        const el = document.querySelector(
+          `[data-mergeId="${appState.currentMerge.draftId}"]`
+        );
+        if (el) {
+          el.selected = true;
+          updateDraftPreview();
+        }
+      }
+      if (data.mergeConditions) {
+        appState.mergeConditions = JSON.parse(data.mergeConditions);
+      }
+    }
+
+    function resetForm() {
+      form.reset();
+    }
+    // -----------------------------------//
+    // Handle the form submit -----------//
+    // -----------------------------------//
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const errors = Object.entries(validateForm(e.target));
+      // handling case for when mergetitle is missing from form
+
+      if (!appState.draftForm.mergetitle) {
+        errors.push(["mergetitle", "This field is required"]);
+      }
+      if (errors.length) {
+        // alert user next to preview button which fields have errors
+        totalFormErrorsAlert(errors);
+        errorMessage(errors);
+        return;
+      }
+      const formData = formToObject(e.target);
+
+      const email = appState.drafts.find(
+        (draft) => draft.id === appState.currentMerge.draftId
+      );
+      email.from = formData.alias;
+      /*
+      clear out the preview div, this is in case the user has either edited the
+      merge or ran the process before
+      */
+      const previewContent = document.querySelector(".preview__output");
+      previewContent.innerHTML = "";
+      // show the next stage of the process
+      handleTransition(
+        this.parentElement.dataset.current,
+        this.parentElement.dataset.next
+      );
+      // show the loading animation
+
+      handleLoading(this.parentElement.dataset.next);
+
+      // add the merge title and id to appState merges array
+      // then save it to script cache mergeId is how I handle keeping track of
+      // whether or not this particular merge has been performed before.
+      const mergeId = appState.currentMerge.mergeId
+        ? appState.currentMerge.mergeId
+        : uuid();
+      appState.currentMerge.mergeId = mergeId;
+      appState.currentMerge.attachments = email.attachments || [];
+      // look at merges array, if something exists for the mergeId update the data for it
+      // otherwise add the current merge to the array for use on future runs.
+      const mergeFound = appState.merges.find(
+        (merge) => merge.mergeId === mergeId
+      );
+      if (mergeFound) {
+        // a merge exists, update the current merge information with the data from the form
+        appState.merges = appState.merges.map((merge) => {
+          if (merge.mergeId === mergeId) {
+            merge.fields = {
+              recipients: formData.recipients,
+              mergeType: formData.mergetype,
+              mergeTitle: formData.mergetitle,
+              alias: formData.alias,
+            };
+            merge.draftId = appState.currentMerge.draftId;
+            merge.mergeId = mergeId;
+            merge.attachments = email.attachments || [];
+            return merge;
+          }
+          return merge;
+        });
+      } else {
+        // merge doesn't exist yet, add the merge to the list of merges ran by the user
+        appState.merges.push({
+          fields: {
+            recipients: formData.recipients,
+            mergeType: formData.mergetype,
+            mergeTitle: formData.mergetitle,
+            alias: formData.alias,
+          },
+          draftId: appState.currentMerge.draftId,
+          mergeId,
+          attachments: email.attachments || [],
+        });
+      }
+      // store the updated merges array in the script cache
+      google.script.run
+        .withSuccessHandler(showMergeConditionsUI)
+        .storeMailMerge({
+          merges: JSON.stringify(appState.merges),
+          currentMerge: JSON.stringify(appState.currentMerge),
+        });
+      // save the current email info to the app state, will use in the sendMerge Function
+      appState.email = email;
+      // show the conditions UI
+    });
+
+    // -----------------------------------//
+    // Show the merge conditions -----------//
+    // -----------------------------------//
+    function showMergeConditionsUI(data) {
+      handleLoading(null, "cancel");
+      const parentDiv = document.getElementById("conditions");
+      const conditionsDiv = parentDiv.querySelector("#merge-conditions");
+      const existingMergeConditions = Array.from(
+        document.querySelectorAll('[id^="mergeCondition"]')
+      );
+
+      parentDiv
+        .querySelector("#add-condition")
+        .addEventListener("click", (e) => {
+          handleAddInput();
+        });
+      if (data && data.mergeConditions) {
+        const mergeConditions = JSON.parse(data.mergeConditions);
+
+        mergeConditions.forEach((condition) => {
+          if (
+            !existingMergeConditions.find(
+              (c) => parseFloat(c.id.split("-")[1]) == condition.id
+            )
+          ) {
+            createConditionInputGroup(
+              conditionsDiv,
+              condition.id,
+              condition.column,
+              condition.condition
+            );
+          }
+        });
+      }
+      //   if(data.mergeConditions && data.mergeConditions.length){
+      //   appState.mergeConditions = data.mergeConditions ? JSON.stringify(data.mergeConditions) : [];
+      // }
+
+      // #region functionality
+
+      function generateOptions(array, column) {
+        return array
+          .map(
+            (item) => `
+          <option value="${item}" ${
+              item === column ? 'selected="true"' : ""
+            }>${item}</option>
+        `
+          )
+          .join("");
+      }
+      function handleChange(e) {
+        const mergeCondition = appState.mergeConditions.find(
+          (condition) => condition.id == e.target.id.split("-")[1]
+        );
+        mergeCondition[e.target.name] = e.target.value;
+        google.script.run.storeMailMerge({
+          mergeConditions: JSON.stringify(appState.mergeConditions),
+        });
+      }
+      function handleDelete(e) {
+        // TODO handle removing merge conditions
+        const mergeConditionId = e.target.id.split("-")[1];
+        const filteredMergeConditions = appState.mergeConditions.filter(
+          (condition) => condition.id != mergeConditionId
+        );
+        appState.mergeConditions = filteredMergeConditions;
+        const mergeConditionContainer = conditionsDiv.querySelector(
+          `#mergeCondition-${mergeConditionId}`
+        );
+        conditionsDiv.removeChild(mergeConditionContainer);
+        // console.log('removing merge condition',appState)
+        google.script.run.storeMailMerge({
+          mergeConditions: JSON.stringify(appState.mergeConditions),
+        });
+      }
+      function createConditionInputGroup(
+        parentDiv = conditionsDiv,
+        id,
+        column = "",
+        condition = ""
+      ) {
+        parentDiv.insertAdjacentHTML(
+          "beforeend",
+          `
+        <div class="condition-container" id="mergeCondition-${id}">
+          <div id="mergeCondition-${id}" class="form__input-group">
+            <select id="columns-${id}" name="column">
+              <option disabled value=" ">Add Condition to Column</option>
+              ${generateOptions(appState.columnHeadings, column)}
+              </select>
+              <label for="columns-${id}">Column Header</label>
+          </div>
+          <div>
+                =
+          </div>
+          <div class="form__input-group">
+            <input type="text" id="condition-${id}" name="condition" >
+            <label for="condition-${id}">Condition</label>
+          </div>
+          <button id="remove-${id}">Remove Condition</button>
+        </div>
+                  `
+        );
+        // now set up the onChange handlers for the new merge condition
+
+        const columnSelect = parentDiv.querySelector(`#columns-${id}`);
+        columnSelect.addEventListener("change", handleChange);
+        const conditionInput = parentDiv.querySelector(`#condition-${id}`);
+        conditionInput.value = condition;
+        conditionInput.addEventListener("change", handleChange);
+        const removeCondition = parentDiv.querySelector(`#remove-${id}`);
+        removeCondition.addEventListener("click", handleDelete);
+      }
+      const handleAddInput = () => {
+        const lastMergeCondition = last(appState.mergeConditions);
+        const mergeConditionId = lastMergeCondition
+          ? lastMergeCondition.id + 1
+          : 1;
+        // add the blank merge condition to app state
+        appState.mergeConditions.push({
+          id: mergeConditionId,
+          condition: "",
+          column: "",
+        });
+        // insert the merge condition into the document
+        createConditionInputGroup(conditionsDiv, mergeConditionId);
+      };
+      // #endregion functionality
+    }
+
+    // -----------------------------------//
+    // Custom Attachment UI -----------//
+    // -----------------------------------//
+
+    function initAttachmentUI() {
+      handleLoading(null, "cancel");
+
+      const attachmentContainer = document.getElementById("attachments");
+      const attachmentIDEl = document.getElementById("attachmentIds");
+      const customDocToggles = attachmentContainer.querySelectorAll(
+        'input[name="customAttachmentRadio"]'
+      );
+      const nextButton = document.querySelector(".attachments__action--next");
+
+      function handleDocIdVerification(data) {
+        const [error, url] = data;
+        if (error) {
+          console.log(error);
+          nextButton.disabled = true;
+          appState.currentMerge.customAttachment = {
+            ...appState.currentMerge.customAttachment,
+            isVerified: false,
+          };
+        } else {
+          // verification successful, store info and enable the next button
+
+          nextButton.disabled = false;
+          appState.currentMerge.customAttachment = {
+            ...appState.currentMerge.customAttachment,
+            isVerified: true,
+          };
+          console.log(url);
+        }
+
+        // store results in the cache
+        google.script.run.storeMailMerge({
+          currentMerge: JSON.stringify(appState.currentMerge),
+        });
+      }
+
+      function handleDocIdInput(e) {
+        appState.currentMerge.customAttachment = {
+          ...appState.currentMerge.customAttachment,
+          templateId: e.target.value.trim(),
+        };
+        // verify doc?
+        google.script.run
+          .withSuccessHandler(handleDocIdVerification)
+          .verifyTemplateId(e.target.value.trim());
+        // save to cache
+        // store custom Attachment info in the cache
+        google.script.run.storeMailMerge({
+          currentMerge: JSON.stringify(appState.currentMerge),
+        });
+      }
+
+      function handleToggleChange(e) {
+        appState.currentMerge.customAttachment = {
+          ...appState.currentMerge.customAttachment,
+          includeAttachment: e.target.value,
+        };
+
+        if (e.target.value === "yes") {
+          const el = addAttachmentIdInput(attachmentIDEl);
+          el.addEventListener("change", handleDocIdInput);
+          nextButton.disabled = true;
+        } else {
+          const inputContainer = attachmentIDEl.querySelector(
+            "#customAttachment"
+          );
+          // if the docID input exists remove it
+          if (inputContainer) {
+            attachmentIDEl.removeChild(inputContainer);
+          }
+          // remove the docId from appstate
+          appState.currentMerge.customAttachment = {
+            includeAttachment: "no",
+            templateId: "",
+            type: "slide",
+          };
+          nextButton.disabled = false;
+        }
+        // store custom Attachment info in the cache
+        google.script.run.storeMailMerge({
+          currentMerge: JSON.stringify(appState.currentMerge),
+        });
+      }
+
+      function updateInputs() {
+        customDocToggles.forEach((toggle) => {
+          toggle.value ===
+          appState.currentMerge.customAttachment.includeAttachment
+            ? (toggle.checked = true)
+            : (toggle.checked = false);
+        });
+        if (
+          appState.currentMerge.customAttachment.includeAttachment === "yes"
+        ) {
+          const el = addAttachmentIdInput(attachmentIDEl);
+          el.addEventListener("change", handleDocIdInput);
+          el.value = appState.currentMerge.customAttachment.templateId;
+
+          if (appState.currentMerge.customAttachment.isVerified === true) {
+            nextButton.disabled = false;
+          }
+        }
+      }
+
+      customDocToggles.forEach((toggle) =>
+        toggle.addEventListener("change", handleToggleChange)
+      );
+      updateInputs();
+    }
+
+    function addAttachmentIdInput(el) {
+      el.insertAdjacentHTML(
+        "beforeend",
+        `
+            <div id="customAttachment" class="form__input-group">
+              <input type="text" id="attachmentId" name="attachment" />
+              <label for="attachmentId">Document ID</label>
+            </div>
+        `
+      );
+      return document.querySelector("#attachmentId");
+    }
+
+    // -----------------------------------//
+    // Show the merge Preview -----------//
+    // -----------------------------------//
+
+    function showPreviewUI(previewObj) {
+      // console.log(previewObj)
+      const messages = previewObj.mergePreview;
+      const { attachments } = appState.currentMerge;
+      const { remainingQuota } = previewObj;
+      const previewContent = document.querySelector(".preview__output");
+      previewContent.innerHTML = "";
+      appState.loadingTimeout = window.setTimeout(() => {
+        // special case for if the back button is pressed before
+        // data arrives
+        if (previewContent.parentElement.matches(".ui-hidden")) {
+          return;
+        }
+        handleLoading("preview");
+
+        if (!messages || !messages.length) {
+          // no messages, show info to user and change merge button to close the app.
+          previewContent.insertAdjacentHTML(
+            "beforeend",
+            `
+          <span class="email-preview__whoops">\\(o_o)/</span>
+          <div class="email-preview__whoops">
+            <p>Whoops! It looks like there aren't any rows to merge. Make sure you have recipients to send to or check your merge status column.</p>
+            <p>Hint: If you need to resend a merge just delete the text in the merge status column for the recipient you wish to email again.</p>
+          </div>
+
+        `
+          );
+          const actionDiv = document.querySelector(".preview__action");
+          const nextButton = document.querySelector(".preview__action--next");
+          nextButton.parentElement.removeChild(nextButton);
+          const closeButtonHtml = `
+        <button onclick="google.script.host.close()" class="btn-primary">Close</button>
+        `;
+          actionDiv.insertAdjacentHTML("beforeend", closeButtonHtml);
+          return;
+        }
+        // previewContent is the preview div to dump the previews
+        previewContent.innerHTML += `
+        <h2>Message Previews - Attempting ${messages.length} merge${
+          messages.length === 1 ? "" : "s"
+        } as ${
+          appState.currentMerge.mergetype === "drafts" ? "drafts" : "emails"
+        }</h2>
+        <p>You have ${remainingQuota} messages left to send today.</p>
+
+      `;
+
+        messages.forEach((message, i) => {
+          const html = `
+          <div class="email-preview">
+            <h2>Message ${i + 1} of ${messages.length}</h2>
+            <div class="email-preview__recipients">
+              <p><span>To</span> ${message.to}</p>
+              <p><span>CC</span> ${message.cc}</p>
+              <p><span>BCC</span> ${message.bcc}</p>
+            </div>
+            <div class="email-preview__subject">
+              <p><span>Subject</span> ${message.subject}</p>
+            </div>
+            <div class="email-preview__body">
+              ${message.body}
+            </div>
+            <div class="email-preview__attachments">
+              <p><span>Attachments</span>${attachments.join(", ")}</p>
+              </div>
+          </div>
+        `;
+          previewContent.innerHTML += html;
+        });
+      }, 3000);
+    }
+
+    // Confirmation UI //
+    // -------------  //
+
+    function showConfirmationUI(data) {
+      if (!data) return;
+      const confirmationDiv = document.querySelector("#confirmation__content");
+      if (data.error) {
+        console.error("error in showing confirmation page");
+        console.error(data.error);
+        console.error(data.stack);
+        handleLoading("confirmation");
+        confirmationDiv.innerHTML = "whoops";
+        return;
+      }
+
+      handleLoading("confirmation");
+      const { mergeInfo } = data;
+
+      const html = `
+    <h2>Merge Results</h2>
+    <h3>Type of Merge: Sent as ${mergeInfo.type}</h3>
+    <h3>Successful Merges: ${mergeInfo.success.length}</h3>
+    <h3>Failed Merges: ${mergeInfo.fail.length}</h3>
+    <h3>Skipped Merges: ${mergeInfo.skip.length}</h3>
+    <button onclick="google.script.host.close()">Close</button>
+`;
+
+      confirmationDiv.innerHTML = html;
+    }
+
+    // -----------------------------------//
+    // Insert Error messages into DOM
+    // -----------------------------------//
+
+    function errorMessage(errors) {
+      errors.forEach((error) => {
+        const [name, message] = error;
+        let el = document.querySelector(`[name="${name}"]`);
+        if (name === "mergetitle" && !el) {
+          el = document.querySelector(".form__input-group.merge-title");
+        }
+        const parent = el.parentElement;
+        const currentError = parent.querySelector(".message__error");
+        if (currentError) {
+          parent.removeChild(currentError);
+        }
+        parent.insertAdjacentHTML(
+          "afterbegin",
+          ` <span class="message__error">${message}</span>`
+        );
+      });
+    }
+
+    function totalFormErrorsAlert(errors = []) {
+      const formSubmitDiv = document.querySelector(".form__submit");
+      const currentError = formSubmitDiv.querySelector(".message__error");
+      if (!errors.length && currentError) {
+        // no more errors clean up message
+        formSubmitDiv.removeChild(currentError);
+        return;
+      }
+      const errorHTML = errors
+        .map((error) => {
+          const [name, message] = error;
+          return name;
+        })
+        .join(", ");
+      const html = errors.length
+        ? `<p class="message__error">The following fields contained errors: ${errorHTML}</p>`
+        : "";
+
+      if (currentError) {
+        formSubmitDiv.removeChild(currentError);
+      }
+      formSubmitDiv.insertAdjacentHTML("beforeend", html);
+    }
+
+    /**
+     *
+     * Page transitions
+     *
+     * */
+
+    /**
+     * @function navigate handles changing screens in app
+     * @param {string} command="next|prev" - go forward or backward a screen
+     */
+    function navigate(command = "next") {
+      // if moving forward, increment app state's page index
+      // if moving backward, decrement app state's page index
+    }
+
+    function handleTransition(currEl, nextEl) {
+      // hide current ui
+      document.querySelector(`#${currEl}`).classList.toggle("ui-hidden");
+      // show next ui
+      document.querySelector(`#${nextEl}`).classList.toggle("ui-hidden");
+      // handleLoading(nextEl);
+    }
+
+    function handleLoading(id, cancel) {
+      // cancel any loading timeout animations
+      if (cancel) {
+        const loadingDiv = document.querySelector(".loading");
+        // remove the div if it exists, otherwise add it.
+        if (loadingDiv) document.body.removeChild(loadingDiv);
+
+        if (appState.loadingTimeout) {
+          clearTimeout(appState.loadingTimeout);
+
+          appState.loadingTimeout = null;
+        }
+        return;
+      }
+      // if (id === 'initial-ui') return;
+      parentDiv = document.getElementById("app");
+      const loadingHTML = `
+        <div class="loading ${id === "initial-ui" ? "initial-ui" : ""}">
+          <div class="container">
+            <div class="box">
+              <div class="border one"></div>
+              <div class="border two"></div>
+              <div class="border three"></div>
+              <div class="border four"></div>
+
+              <div class="line one"></div>
+              <div class="line two"></div>
+              <div class="line three"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const loadingDiv = document.querySelector(".loading");
+      // remove the div if it exists, otherwise add it.
+      if (loadingDiv) return document.body.removeChild(loadingDiv);
+
+      parentDiv.insertAdjacentHTML("afterend", loadingHTML);
+    }
+  })();
+</script>
