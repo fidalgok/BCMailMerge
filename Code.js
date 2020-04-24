@@ -32,14 +32,40 @@ function getAliases() {
   return data;
 }
 
-function verifyTemplateId(id) {
+function verifyTemplateId({ templateId, elementId }) {
+  templateId = templateId || '1mHBCSw3htUKBss-OSvyl3xJfzBYjON-dbewJDayhN-8';
   try {
-    const templateFile = DriveApp.getFileById(id);
-    if (templateFile) {
-      return [null, templateFile.getUrl()];
+    const templateFile = DriveApp.getFileById(templateId);
+    const mimeType = templateFile.getMimeType();
+    // only supporting Google Docs and Google Slides at the moment. Throw an error
+    // if they don't match up
+    if (
+      mimeType === 'application/vnd.google-apps.document' ||
+      mimeType === 'application/vnd.google-apps.presentation'
+    ) {
+      if (templateFile) {
+        return [
+          null,
+          { url: templateFile.getUrl(), fileType: mimeType, elementId },
+        ];
+      }
     }
+    return [
+      {
+        message:
+          'Unsupported file template, please use Google Docs or Google Slides to create your template',
+      },
+      {
+        elementId,
+      },
+    ];
   } catch (e) {
-    return [{ error: 'Template not found' }];
+    return [
+      { message: e.message },
+      {
+        elementId,
+      },
+    ];
   }
 }
 function getUserDrafts(refresh) {
@@ -367,9 +393,18 @@ function fillInTemplateFromObject(template, data) {
 // needs a doc type (Google Doc or Slide)
 // needs the template doc ID
 // will generate a PDF
-function generateCustomPDF(templateType, templateId, headers, mergeData) {
-  templateType = templateType || 'slide';
+function generateCustomPDF(
+  templateType,
+  templateId,
+  headers,
+  mergeData,
+  templateName
+) {
+  templateType = templateType || 'application/vnd.google-apps.presentation';
   templateId = templateId || '1J506aPFw1clXZ5y18zSUSnKMqFCtXfql_20cpr3w-KM';
+  const newTemplateName = templateName
+    ? fillInTemplateFromObject(templateName, mergeData)
+    : `${mergeData.firstName} ${mergeData.lastName} merge test`;
   headers = headers || ['First Name', 'Last Name', 'Seminar Name'];
   mergeData = mergeData || {
     firstName: 'Kyle',
@@ -391,23 +426,35 @@ function generateCustomPDF(templateType, templateId, headers, mergeData) {
     parentFolder = folder;
     parentFolderId = folder.getId();
   }
-
+  // TODO: grab doc title sent from client
   const customPresentationFile = templateFile.makeCopy(
-    `${mergeData.seminarName} Attendance Certificate`,
+    newTemplateName,
     parentFolder
   );
-  const customPresentation = SlidesApp.openById(customPresentationFile.getId());
 
-  // replace the text with merge data
-  // headers has the headers in their original state so we can search for the replacement text
-  // normalize headers allows us to grab the data off the merge object by the key name
-  headers.forEach(header => {
-    customPresentation.replaceAllText(
-      `<<${header}>>`,
-      mergeData[normalizeHeader(header)]
+  // check for file type, only support GOOGLE_DOCS and GOOGLE_SLIDES for now
+  // Docs and slides have different API's so I have to handle each separately
+  if (templateType === 'application/vnd.google-apps.document') {
+    // TODO : add docs support
+  } else if (templateType === 'application/vnd.google-apps.presentation') {
+    const customPresentation = SlidesApp.openById(
+      customPresentationFile.getId()
     );
-  });
-  customPresentation.saveAndClose();
+
+    // replace the text with merge data
+    // headers has the headers in their original state so we can search for the replacement text
+    // normalize headers allows us to grab the data off the merge object by the key name
+    headers.forEach(header => {
+      customPresentation.replaceAllText(
+        `<<${header}>>`,
+        mergeData[normalizeHeader(header)]
+      );
+    });
+    customPresentation.saveAndClose();
+  } else {
+    // mimeType not supported, skip creating PDF
+    // TODO: return error here.
+  }
 
   // return as pdf
   return customPresentationFile.getAs('application/pdf');

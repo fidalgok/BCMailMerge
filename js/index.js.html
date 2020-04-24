@@ -14,7 +14,7 @@
         draftId: "",
         mergeId: "",
         customAttachment: {
-          type: "slide",
+          type: "",
           includeAttachment: "no",
           templateId: "",
         },
@@ -857,16 +857,17 @@
 
     function initAttachmentUI() {
       handleLoading(null, "cancel");
-
       const attachmentContainer = document.getElementById("attachments");
       const attachmentIDEl = document.getElementById("attachmentIds");
       const customDocToggles = attachmentContainer.querySelectorAll(
         'input[name="customAttachmentRadio"]'
       );
       const nextButton = document.querySelector(".attachments__action--next");
+      // set up a tiny bit of local state to keep track of inputs
+      const docIdInputs = [];
 
       function handleDocIdVerification(data) {
-        const [error, url] = data;
+        const [error, info] = data;
         if (error) {
           console.log(error);
           nextButton.disabled = true;
@@ -874,15 +875,45 @@
             ...appState.currentMerge.customAttachment,
             isVerified: false,
           };
+          // TODO update Interface with error
+          const el = document.getElementById(info.elementId);
+          const parent = el.parentElement;
+          const currentError = parent.querySelector(".message__error");
+          const currentSuccess = parent.querySelector(".message__success");
+          if (currentError) {
+            parent.removeChild(currentError);
+          }
+          if (currentSuccess) {
+            parent.removeChild(currentSuccess);
+          }
+          parent.insertAdjacentHTML(
+            "afterbegin",
+            ` <span class="message__error">${error.message} Check your document ID and try again.</span>`
+          );
         } else {
           // verification successful, store info and enable the next button
-
           nextButton.disabled = false;
           appState.currentMerge.customAttachment = {
             ...appState.currentMerge.customAttachment,
             isVerified: true,
+            type: info.fileType,
           };
-          console.log(url);
+          // TODO: update interface with success message
+          // first clear errors if any
+          const el = document.getElementById(info.elementId);
+          const parent = el.parentElement;
+          const currentError = parent.querySelector(".message__error");
+          if (currentError) {
+            parent.removeChild(currentError);
+          }
+          // show success message
+          parent.insertAdjacentHTML(
+            "afterbegin",
+            `
+            <span class="message__success">Success! document found. <a href="${info.url}" target="_blank">Preview document in a new tab.</a></span>
+          `
+          );
+          console.log(info);
         }
 
         // store results in the cache
@@ -899,7 +930,10 @@
         // verify doc?
         google.script.run
           .withSuccessHandler(handleDocIdVerification)
-          .verifyTemplateId(e.target.value.trim());
+          .verifyTemplateId({
+            templateId: e.target.value.trim(),
+            elementId: e.target.id,
+          });
         // save to cache
         // store custom Attachment info in the cache
         google.script.run.storeMailMerge({
@@ -966,6 +1000,7 @@
     }
 
     function addAttachmentIdInput(el) {
+      // TODO: add capability to keep track of multiple attachments
       el.insertAdjacentHTML(
         "beforeend",
         `

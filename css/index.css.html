@@ -4,13 +4,13 @@
     --color-grey-secondary: #626b78;
     --color-grey-tertiary: #aeb4bc;
     --color-grey-100: #fafafc;
-    --color-warning: #FF5B54;
-    --color-warning-900: #3D1E1D;
-    --color-warning-800: #BF1A11;
-    --color-warning-300: #FFA7A2;
-    --color-warning-100: #FFE2E1;
-    --color-primary: #4098D7;
-    --color-primary-800: #0F609B;
+    --color-warning: #ff5b54;
+    --color-warning-900: #3d1e1d;
+    --color-warning-800: #bf1a11;
+    --color-warning-300: #ffa7a2;
+    --color-warning-100: #ffe2e1;
+    --color-primary: #4098d7;
+    --color-primary-800: #0f609b;
     --color-secondary-800: hsl(234, 62%, 26%);
     --color-secondary-100: hsl(221, 68%, 93%);
   }
@@ -34,7 +34,6 @@
     font-weight: 600;
     font-size: 5rem;
     margin: 0 0 1rem;
-
   }
 
   h1,
@@ -43,7 +42,6 @@
     line-height: 1.12;
   }
 
-
   body {
     display: flex;
     flex-wrap: wrap;
@@ -51,19 +49,9 @@
     justify-content: center;
     font-size: 1.6rem;
     font-weight: 400;
-    font-family:
-      "Work Sans",
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      Roboto,
-      Helvetica,
-      Arial,
-      sans-serif,
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol';
-
+    font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+      Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol";
   }
 
   .section {
@@ -84,7 +72,7 @@
     margin-top: 2rem;
     border: 1px solid hsl(210, 35%, 80%);
     background: hsl(210, 36%, 96%);
-    border-radius: .5rem;
+    border-radius: 0.5rem;
   }
 
   .template-draft {
@@ -94,7 +82,6 @@
     margin-bottom: 4.5rem;
   }
 
-
   #editor {
     min-height: 250px;
     background: #f4f5f6;
@@ -103,8 +90,7 @@
     border-radius: 2px;
     resize: none;
     position: relative;
-    transition: outline .1s linear;
-
+    transition: outline 0.1s linear;
   }
 
   :focus {
@@ -116,17 +102,13 @@
     outline-offset: -2px;
   }
 
-
-
   #app {
     width: 100%;
   }
 
-
   form {
     flex-basis: 50%;
     min-width: 450px;
-
   }
 
   #initial-ui {
@@ -149,11 +131,9 @@
 
   #merge-placeholders h3 {
     padding: 3px 0px;
-
   }
 
   #preview {
-
     width: 100%;
     display: flex;
     justify-content: space-between;
@@ -170,7 +150,7 @@
     font-size: 6rem;
     display: block;
     margin-top: 4.5rem;
-    font-family: 'Roboto Mono', monospace;
+    font-family: "Roboto Mono", monospace;
     text-align: center;
   }
 
@@ -191,7 +171,7 @@
 
   input,
   select {
-    transition: outline .1s linear;
+    transition: outline 0.1s linear;
 
     height: 3rem;
   }
@@ -209,7 +189,6 @@
     position: relative;
     display: flex;
     flex-direction: column-reverse;
-
   }
 
   .form__input-group.form__submit {
@@ -225,7 +204,6 @@
     width: 75%;
   }
 
-
   .form__input-group input[type="text"] {
     border: none;
     padding: 20px 8px;
@@ -236,12 +214,12 @@
   .form__input-group label {
     margin-bottom: 10px;
     display: block;
-    transition: color .1s linear;
+    transition: color 0.1s linear;
   }
 
-  input:focus~label,
-  select:focus~label,
-  #editor:focus-within~label {
+  input:focus ~ label,
+  select:focus ~ label,
+  #editor:focus-within ~ label {
     color: var(--color-primary);
   }
 
@@ -265,7 +243,7 @@
     color: var(--color-black-800);
     font-size: 1.6rem;
     padding: 10px 15px;
-    transition: all .1s linear;
+    transition: all 0.1s linear;
   }
 
   button:hover {
@@ -280,7 +258,6 @@
 
     background: var(--color-primary);
     color: white;
-
   }
 
   form button[type="submit"] {
@@ -293,7 +270,6 @@
     border: solid 1px transparent;
     background: var(--color-primary-800);
     color: white;
-
   }
 
   button#configure-merge-info {
@@ -306,16 +282,16 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: all .12s linear;
+    transition: all 0.12s linear;
   }
 
   button#refresh-drafts[data-loading="false"] .spinner-container {
     display: none;
   }
-  
+
   button.btn-primary.attachments__action--next:disabled {
     cursor: not-allowed;
-    opacity: .5;
+    opacity: 0.5;
   }
 
   label[for="body"] {
@@ -347,8 +323,13 @@
     color: var(--color-warning);
     animation-name: shake;
     animation-duration: 1s;
-    animation-delay: .15s;
+    animation-delay: 0.15s;
+  }
+  .form__input-group .message__success,
+  .form__section .message__success {
+    display: block;
 
+    padding-top: 10px;
   }
 
   .form__input-group.form__submit .message__error {
@@ -377,9 +358,7 @@
     fill: var(--color-secondary-100);
   }
 
-
   @keyframes shake {
-
     from,
     to {
       -webkit-transform: translate3d(0, 0, 0);
@@ -423,9 +402,8 @@
     align-items: baseline;
     justify-items: center;
     grid-gap: 1rem;
-
   }
-  #merge-conditions .form__input-group{
+  #merge-conditions .form__input-group {
     justify-self: stretch;
   }
 
@@ -434,12 +412,11 @@
     width: 100%;
   }
 
-#add-condition {
-  margin-bottom: 2.4rem;
-}
+  #add-condition {
+    margin-bottom: 2.4rem;
+  }
 
   #draft-preview {
-
     height: 350px;
     overflow-y: auto;
     line-height: 1.4;
@@ -478,7 +455,6 @@
     position: fixed;
     top: 0;
     left: 0;
-
   }
 
   #preview .loading {
@@ -496,7 +472,7 @@
   }
 
   .email-preview {
-    box-shadow: 0px 2px 4px rgba(0, 0, 0, .1);
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
     margin-bottom: 40px;
   }
 
@@ -514,7 +490,7 @@
 
   .email-preview__recipients p,
   .email-preview__subject p {
-    border-bottom: 1px solid rgba(0, 0, 0, .12);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
     padding: 20px 8px;
     margin: 0;
   }
@@ -526,13 +502,12 @@
   .email-preview__attachments p {
     padding: 20px 8px;
     margin: 0;
-
   }
 
   .email-preview__body {
     margin-top: 15px;
     padding: 15px 30px;
-    border-bottom: 1px solid rgba(0, 0, 0, .12);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
   }
 
   .email-preview__recipients p span,
@@ -577,7 +552,7 @@
     animation: spinnerLeftRight 0.6s infinite;
   }
 
-  .spinner+label {
+  .spinner + label {
     margin-top: 8px;
     display: inline-block;
     text-transform: uppercase;
@@ -626,7 +601,7 @@
   }
 
   .container::after {
-    content: 'Loading';
+    content: "Loading";
     color: #007298;
     font-weight: 700;
     position: absolute;
@@ -792,7 +767,7 @@
 
     54% {
       left: 25%;
-      width: 0%
+      width: 0%;
     }
 
     55% {
@@ -831,11 +806,11 @@
     }
 
     54% {
-      width: 0%
+      width: 0%;
     }
 
     60% {
-      width: 50%
+      width: 50%;
     }
 
     100% {
@@ -861,7 +836,7 @@
     }
 
     52% {
-      width: 0%
+      width: 0%;
     }
 
     100% {
