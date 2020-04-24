@@ -246,19 +246,26 @@
         <div class="form__section">
           <h2>Set Merge Conditions (Optional)</h2>
           <p class="form__helper-text u-margin-none">
-            If you'd like to only send messages if a certain condition is met, create them here. If you want to send to all recipients in the list continue to the merge preview.
+            If you'd like to send messages if a certain condition is met, create
+            them here. Messages will only send if a condition is matched. If you
+            want to send to all recipients in the list continue to the merge
+            preview.
           </p>
-
+          <p>
+            Choose the column you'd like to match the condition on. Conditions
+            are case sensitive so make sure you are matching the case and
+            spelling exactly.
+          </p>
         </div>
         <div id="merge-conditions">
           <div>
             <button id="add-condition">Add Merge Condition</button>
-            </div>
+          </div>
         </div>
       </div>
-      
+
       <!-- Custom Attachments -->
-      
+
       <div id="attachments" class="ui-hidden">
         <div class="attachments__action">
           <button
@@ -279,26 +286,34 @@
         <div class="form__section">
           <h2>Create Custom Attachments (Optional)</h2>
           <p class="form__helper-text u-margin-none">
-            If you would like to create custom attachments for recipients enter the document ID here.
+            If you would like to create custom attachments for recipients enter
+            the document ID here.
           </p>
-
         </div>
         <div id="attachmentIds">
-           <div class="form__input-group form__radio-group">
-             <div>
-               <input type="radio" id="customAttachmentNo" name="customAttachmentRadio" value="no" checked/>
-               <label for="customAttachmentNo">No</label>
-             </div>
-             <div>
-               <input type="radio" id="customAttachmentYes" name="customAttachmentRadio" value="yes"/>
-               <label for="customAttachmentYes">Yes</label>
-             </div>
-             
-           </div>
-          
+          <div class="form__input-group form__radio-group">
+            <div>
+              <input
+                type="radio"
+                id="customAttachmentNo"
+                name="customAttachmentRadio"
+                value="no"
+                checked
+              />
+              <label for="customAttachmentNo">No</label>
+            </div>
+            <div>
+              <input
+                type="radio"
+                id="customAttachmentYes"
+                name="customAttachmentRadio"
+                value="yes"
+              />
+              <label for="customAttachmentYes">Yes</label>
+            </div>
+          </div>
         </div>
       </div>
-      
 
       <!-- Mail Merge Preview  -->
 
