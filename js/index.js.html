@@ -363,10 +363,10 @@
         if (!appState.mergeTitles || !appState.mergeTitles.length) {
           // nothing to show here
           inputGroup.innerHTML = `
-            <div class="form-info">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="form-icon icon-information"><path class="primary" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20z"></path><path class="secondary" d="M11 12a1 1 0 0 1 0-2h2a1 1 0 0 1 .96 1.27L12.33 17H13a1 1 0 0 1 0 2h-2a1 1 0 0 1-.96-1.27L11.67 12H11zm2-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"></path></svg>
-              <span>Looks like there aren't any stored merge titles. Click the create new merge button to get started with a new merge job.<span></div>
-          `;
+              <div class="form-info">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="form-icon icon-information"><path class="primary" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20z"></path><path class="secondary" d="M11 12a1 1 0 0 1 0-2h2a1 1 0 0 1 .96 1.27L12.33 17H13a1 1 0 0 1 0 2h-2a1 1 0 0 1-.96-1.27L11.67 12H11zm2-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"></path></svg>
+                <span>Looks like there aren't any stored merge titles. Click the create new merge button to get started with a new merge job.<span></div>
+            `;
           return;
         }
         // create a select with options for all merge jobs
@@ -389,8 +389,8 @@
         inputGroup.insertAdjacentHTML(
           "beforeend",
           `
-        <label for="mergetitle">Select A Merge Title</label>
-        `
+          <label for="mergetitle">Select A Merge Title</label>
+          `
         );
         // set up event listeners for newly created input
         select.addEventListener("input", handleInput);
@@ -404,9 +404,9 @@
         }
       } else if (e && e.target.id === "new-merge") {
         const html = `
-        <input type="text" name="mergetitle" id="mergetitle" placeholder="Enter a merge title">
-            <label for="mergetitle">Create Merge Title</label>
-        `;
+          <input type="text" name="mergetitle" id="mergetitle" placeholder="Enter a merge title">
+              <label for="mergetitle">Create Merge Title</label>
+          `;
         inputGroup.innerHTML = html;
         const input = inputGroup.querySelector("input");
         input.addEventListener("input", handleInput);
@@ -545,8 +545,8 @@
         // add the draft info to each div
         if (el.matches(".attachments__content")) {
           el.innerHTML = `
-            ${attachmentNames.join(", ")}
-          `;
+              ${attachmentNames.join(", ")}
+            `;
           return;
         }
         if (el.matches(".body__content")) {
@@ -650,9 +650,9 @@
       );
       email.from = formData.alias;
       /*
-      clear out the preview div, this is in case the user has either edited the
-      merge or ran the process before
-      */
+        clear out the preview div, this is in case the user has either edited the
+        merge or ran the process before
+        */
       const previewContent = document.querySelector(".preview__output");
       previewContent.innerHTML = "";
       // show the next stage of the process
@@ -764,10 +764,10 @@
         return array
           .map(
             (item) => `
-          <option value="${item}" ${
+            <option value="${item}" ${
               item === column ? 'selected="true"' : ""
             }>${item}</option>
-        `
+          `
           )
           .join("");
       }
@@ -805,24 +805,24 @@
         parentDiv.insertAdjacentHTML(
           "beforeend",
           `
-        <div class="condition-container" id="mergeCondition-${id}">
-          <div id="mergeCondition-${id}" class="form__input-group">
-            <select id="columns-${id}" name="column">
-              <option disabled value=" ">Add Condition to Column</option>
-              ${generateOptions(appState.columnHeadings, column)}
-              </select>
-              <label for="columns-${id}">Column Header</label>
+          <div class="condition-container" id="mergeCondition-${id}">
+            <div id="mergeCondition-${id}" class="form__input-group">
+              <select id="columns-${id}" name="column">
+                <option disabled value=" ">Add Condition to Column</option>
+                ${generateOptions(appState.columnHeadings, column)}
+                </select>
+                <label for="columns-${id}">Column Header</label>
+            </div>
+            <div>
+                  =
+            </div>
+            <div class="form__input-group">
+              <input type="text" id="condition-${id}" name="condition" >
+              <label for="condition-${id}">Condition</label>
+            </div>
+            <button id="remove-${id}">Remove Condition</button>
           </div>
-          <div>
-                =
-          </div>
-          <div class="form__input-group">
-            <input type="text" id="condition-${id}" name="condition" >
-            <label for="condition-${id}">Condition</label>
-          </div>
-          <button id="remove-${id}">Remove Condition</button>
-        </div>
-                  `
+                    `
         );
         // now set up the onChange handlers for the new merge condition
 
@@ -910,8 +910,8 @@
           parent.insertAdjacentHTML(
             "afterbegin",
             `
-            <span class="message__success">Success! document found. <a href="${info.url}" target="_blank">Preview document in a new tab.</a></span>
-          `
+              <span class="message__success">Success! document found. <a href="${info.url}" target="_blank">Preview document in a new tab.</a></span>
+            `
           );
           console.log(info);
         }
@@ -946,24 +946,28 @@
           ...appState.currentMerge.customAttachment,
           includeAttachment: e.target.value,
         };
+        const inputContainer = attachmentIDEl.querySelector(
+          "#customAttachment"
+        );
 
         if (e.target.value === "yes") {
-          const el = addAttachmentIdInput(attachmentIDEl);
-          el.addEventListener("change", handleDocIdInput);
+          console.log("toggle changed to yes, creating input group");
+          if (!inputContainer) {
+            const el = addAttachmentIdInput(attachmentIDEl);
+            el.addEventListener("change", handleDocIdInput);
+          }
           nextButton.disabled = true;
         } else {
-          const inputContainer = attachmentIDEl.querySelector(
-            "#customAttachment"
-          );
           // if the docID input exists remove it
           if (inputContainer) {
             attachmentIDEl.removeChild(inputContainer);
           }
+
           // remove the docId from appstate
           appState.currentMerge.customAttachment = {
             includeAttachment: "no",
             templateId: "",
-            type: "slide",
+            type: "",
           };
           nextButton.disabled = false;
         }
@@ -983,9 +987,27 @@
         if (
           appState.currentMerge.customAttachment.includeAttachment === "yes"
         ) {
-          const el = addAttachmentIdInput(attachmentIDEl);
-          el.addEventListener("change", handleDocIdInput);
-          el.value = appState.currentMerge.customAttachment.templateId;
+          const currentInputs = document.querySelectorAll(
+            'input[id^="attachmentId"]'
+          );
+          if (currentInputs.length === 0) {
+            console.log(
+              "in update inputs, current input length is 0, creating input"
+            );
+            const el = addAttachmentIdInput(attachmentIDEl);
+            el.addEventListener("change", handleDocIdInput);
+            el.value = appState.currentMerge.customAttachment.templateId;
+            // need to verify the id again just in case
+            google.script.run
+              .withSuccessHandler(handleDocIdVerification)
+              .verifyTemplateId({
+                templateId: appState.currentMerge.customAttachment.templateId,
+                elementId: el.id,
+              });
+          } else {
+            currentInputs[0].value =
+              appState.currentMerge.customAttachment.templateId;
+          }
 
           if (appState.currentMerge.customAttachment.isVerified === true) {
             nextButton.disabled = false;
@@ -993,9 +1015,10 @@
         }
       }
 
-      customDocToggles.forEach((toggle) =>
-        toggle.addEventListener("change", handleToggleChange)
-      );
+      customDocToggles.forEach((toggle) => {
+        toggle.removeEventListener("change", handleToggleChange);
+        toggle.addEventListener("change", handleToggleChange);
+      });
       updateInputs();
     }
 
@@ -1004,11 +1027,11 @@
       el.insertAdjacentHTML(
         "beforeend",
         `
-            <div id="customAttachment" class="form__input-group">
-              <input type="text" id="attachmentId" name="attachment" />
-              <label for="attachmentId">Document ID</label>
-            </div>
-        `
+              <div id="customAttachment" class="form__input-group">
+                <input type="text" id="attachmentId" name="attachment" />
+                <label for="attachmentId">Document ID</label>
+              </div>
+          `
       );
       return document.querySelector("#attachmentId");
     }
@@ -1037,54 +1060,54 @@
           previewContent.insertAdjacentHTML(
             "beforeend",
             `
-          <span class="email-preview__whoops">\\(o_o)/</span>
-          <div class="email-preview__whoops">
-            <p>Whoops! It looks like there aren't any rows to merge. Make sure you have recipients to send to or check your merge status column.</p>
-            <p>Hint: If you need to resend a merge just delete the text in the merge status column for the recipient you wish to email again.</p>
-          </div>
+            <span class="email-preview__whoops">\\(o_o)/</span>
+            <div class="email-preview__whoops">
+              <p>Whoops! It looks like there aren't any rows to merge. Make sure you have recipients to send to or check your merge status column.</p>
+              <p>Hint: If you need to resend a merge just delete the text in the merge status column for the recipient you wish to email again.</p>
+            </div>
 
-        `
+          `
           );
           const actionDiv = document.querySelector(".preview__action");
           const nextButton = document.querySelector(".preview__action--next");
           nextButton.parentElement.removeChild(nextButton);
           const closeButtonHtml = `
-        <button onclick="google.script.host.close()" class="btn-primary">Close</button>
-        `;
+          <button onclick="google.script.host.close()" class="btn-primary">Close</button>
+          `;
           actionDiv.insertAdjacentHTML("beforeend", closeButtonHtml);
           return;
         }
         // previewContent is the preview div to dump the previews
         previewContent.innerHTML += `
-        <h2>Message Previews - Attempting ${messages.length} merge${
+          <h2>Message Previews - Attempting ${messages.length} merge${
           messages.length === 1 ? "" : "s"
         } as ${
           appState.currentMerge.mergetype === "drafts" ? "drafts" : "emails"
         }</h2>
-        <p>You have ${remainingQuota} messages left to send today.</p>
+          <p>You have ${remainingQuota} messages left to send today.</p>
 
-      `;
+        `;
 
         messages.forEach((message, i) => {
           const html = `
-          <div class="email-preview">
-            <h2>Message ${i + 1} of ${messages.length}</h2>
-            <div class="email-preview__recipients">
-              <p><span>To</span> ${message.to}</p>
-              <p><span>CC</span> ${message.cc}</p>
-              <p><span>BCC</span> ${message.bcc}</p>
-            </div>
-            <div class="email-preview__subject">
-              <p><span>Subject</span> ${message.subject}</p>
-            </div>
-            <div class="email-preview__body">
-              ${message.body}
-            </div>
-            <div class="email-preview__attachments">
-              <p><span>Attachments</span>${attachments.join(", ")}</p>
+            <div class="email-preview">
+              <h2>Message ${i + 1} of ${messages.length}</h2>
+              <div class="email-preview__recipients">
+                <p><span>To</span> ${message.to}</p>
+                <p><span>CC</span> ${message.cc}</p>
+                <p><span>BCC</span> ${message.bcc}</p>
               </div>
-          </div>
-        `;
+              <div class="email-preview__subject">
+                <p><span>Subject</span> ${message.subject}</p>
+              </div>
+              <div class="email-preview__body">
+                ${message.body}
+              </div>
+              <div class="email-preview__attachments">
+                <p><span>Attachments</span>${attachments.join(", ")}</p>
+                </div>
+            </div>
+          `;
           previewContent.innerHTML += html;
         });
       }, 3000);
@@ -1109,13 +1132,13 @@
       const { mergeInfo } = data;
 
       const html = `
-    <h2>Merge Results</h2>
-    <h3>Type of Merge: Sent as ${mergeInfo.type}</h3>
-    <h3>Successful Merges: ${mergeInfo.success.length}</h3>
-    <h3>Failed Merges: ${mergeInfo.fail.length}</h3>
-    <h3>Skipped Merges: ${mergeInfo.skip.length}</h3>
-    <button onclick="google.script.host.close()">Close</button>
-`;
+      <h2>Merge Results</h2>
+      <h3>Type of Merge: Sent as ${mergeInfo.type}</h3>
+      <h3>Successful Merges: ${mergeInfo.success.length}</h3>
+      <h3>Failed Merges: ${mergeInfo.fail.length}</h3>
+      <h3>Skipped Merges: ${mergeInfo.skip.length}</h3>
+      <button onclick="google.script.host.close()">Close</button>
+  `;
 
       confirmationDiv.innerHTML = html;
     }
@@ -1207,21 +1230,21 @@
       // if (id === 'initial-ui') return;
       parentDiv = document.getElementById("app");
       const loadingHTML = `
-        <div class="loading ${id === "initial-ui" ? "initial-ui" : ""}">
-          <div class="container">
-            <div class="box">
-              <div class="border one"></div>
-              <div class="border two"></div>
-              <div class="border three"></div>
-              <div class="border four"></div>
+          <div class="loading ${id === "initial-ui" ? "initial-ui" : ""}">
+            <div class="container">
+              <div class="box">
+                <div class="border one"></div>
+                <div class="border two"></div>
+                <div class="border three"></div>
+                <div class="border four"></div>
 
-              <div class="line one"></div>
-              <div class="line two"></div>
-              <div class="line three"></div>
+                <div class="line one"></div>
+                <div class="line two"></div>
+                <div class="line three"></div>
+              </div>
             </div>
           </div>
-        </div>
-      `;
+        `;
 
       const loadingDiv = document.querySelector(".loading");
       // remove the div if it exists, otherwise add it.
