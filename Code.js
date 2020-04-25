@@ -400,17 +400,20 @@ function generateCustomPDF(
   mergeData,
   templateName
 ) {
-  templateType = templateType || 'application/vnd.google-apps.presentation';
-  templateId = templateId || '1J506aPFw1clXZ5y18zSUSnKMqFCtXfql_20cpr3w-KM';
-  const newTemplateName = templateName
-    ? fillInTemplateFromObject(templateName, mergeData)
-    : `${mergeData.firstName} ${mergeData.lastName} merge test`;
+  templateType = templateType || 'application/vnd.google-apps.document';
+  // Test Doc ID - 1evqsOl84cM_cdCx9ORmrv3O5HvG91w2YHl860xXxw8c
+  // Test Presentation ID - 1J506aPFw1clXZ5y18zSUSnKMqFCtXfql_20cpr3w-KM
+  templateId = templateId || '1evqsOl84cM_cdCx9ORmrv3O5HvG91w2YHl860xXxw8c';
   headers = headers || ['First Name', 'Last Name', 'Seminar Name'];
   mergeData = mergeData || {
     firstName: 'Kyle',
     lastName: 'Fidalgo',
     seminarName: 'Test Webinar',
   };
+  const newTemplateName = templateName
+    ? fillInTemplateFromObject(templateName, mergeData)
+    : `${mergeData.firstName} ${mergeData.lastName} merge test`;
+
   // need to open the template and get main slide
   // need to get parent folder so we know where to create documents
   // generate new presentation
@@ -436,6 +439,37 @@ function generateCustomPDF(
   // Docs and slides have different API's so I have to handle each separately
   if (templateType === 'application/vnd.google-apps.document') {
     // TODO : add docs support
+    const customDocument = DocumentApp.openById(customPresentationFile.getId());
+    // need to replace text in all document sections
+    const customBody = customDocument.getBody();
+    const customHeader = customDocument.getHeader();
+    const customFooter = customDocument.getFooter();
+    // need to run this on each section
+    if (customBody) {
+      headers.forEach(header => {
+        customBody.replaceText(
+          `<<${header}>>`,
+          mergeData[normalizeHeader(header)]
+        );
+      });
+    }
+    if (customHeader) {
+      headers.forEach(header => {
+        customHeader.replaceText(
+          `<<${header}>>`,
+          mergeData[normalizeHeader(header)]
+        );
+      });
+    }
+    if (customFooter) {
+      headers.forEach(header => {
+        customFooter.replaceText(
+          `<<${header}>>`,
+          mergeData[normalizeHeader(header)]
+        );
+      });
+    }
+    customDocument.saveAndClose();
   } else if (templateType === 'application/vnd.google-apps.presentation') {
     const customPresentation = SlidesApp.openById(
       customPresentationFile.getId()
@@ -454,6 +488,9 @@ function generateCustomPDF(
   } else {
     // mimeType not supported, skip creating PDF
     // TODO: return error here.
+    return {
+      error: 'Document could not be merged',
+    };
   }
 
   // return as pdf
