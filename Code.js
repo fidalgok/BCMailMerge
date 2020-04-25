@@ -289,7 +289,7 @@ function merge(
             )
             .setValue('Error')
             .setBackground('red')
-            .setNote(e.message);
+            .setNote(`${e.message} ${e.stack}`);
           mergeInfo.fail.push({
             email: rowData[emailColumn],
             mergeStatus: e.message,
@@ -445,28 +445,24 @@ function generateCustomPDF(
     const customHeader = customDocument.getHeader();
     const customFooter = customDocument.getFooter();
     // need to run this on each section
+    // also replaceText doesn't work the same for docs as it does for slides
+    // null or undefined values throw an error
     if (customBody) {
       headers.forEach(header => {
-        customBody.replaceText(
-          `<<${header}>>`,
-          mergeData[normalizeHeader(header)]
-        );
+        const replacement = mergeData[normalizeHeader(header)];
+        customBody.replaceText(`<<${header}>>`, replacement || '');
       });
     }
     if (customHeader) {
       headers.forEach(header => {
-        customHeader.replaceText(
-          `<<${header}>>`,
-          mergeData[normalizeHeader(header)]
-        );
+        const replacement = mergeData[normalizeHeader(header)];
+        customHeader.replaceText(`<<${header}>>`, replacement || '');
       });
     }
     if (customFooter) {
       headers.forEach(header => {
-        customFooter.replaceText(
-          `<<${header}>>`,
-          mergeData[normalizeHeader(header)]
-        );
+        const replacement = mergeData[normalizeHeader(header)];
+        customFooter.replaceText(`<<${header}>>`, replacement || '');
       });
     }
     customDocument.saveAndClose();

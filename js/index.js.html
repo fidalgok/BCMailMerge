@@ -878,14 +878,7 @@
           // TODO update Interface with error
           const el = document.getElementById(info.elementId);
           const parent = el.parentElement;
-          const currentError = parent.querySelector(".message__error");
-          const currentSuccess = parent.querySelector(".message__success");
-          if (currentError) {
-            parent.removeChild(currentError);
-          }
-          if (currentSuccess) {
-            parent.removeChild(currentSuccess);
-          }
+
           parent.insertAdjacentHTML(
             "afterbegin",
             ` <span class="message__error">${error.message} Check your document ID and try again.</span>`
@@ -902,10 +895,6 @@
           // first clear errors if any
           const el = document.getElementById(info.elementId);
           const parent = el.parentElement;
-          const currentError = parent.querySelector(".message__error");
-          if (currentError) {
-            parent.removeChild(currentError);
-          }
           // show success message
           parent.insertAdjacentHTML(
             "afterbegin",
@@ -913,7 +902,6 @@
               <span class="message__success">Success! document found. <a href="${info.url}" target="_blank">Preview document in a new tab.</a></span>
             `
           );
-          console.log(info);
         }
 
         // store results in the cache
@@ -927,7 +915,16 @@
           ...appState.currentMerge.customAttachment,
           templateId: e.target.value.trim(),
         };
-        // verify doc?
+        const parent = e.target.parentElement;
+        const currentError = parent.querySelector(".message__error");
+        const currentSuccess = parent.querySelector(".message__success");
+        if (currentError) {
+          parent.removeChild(currentError);
+        }
+        if (currentSuccess) {
+          parent.removeChild(currentSuccess);
+        }
+        // verify doc
         google.script.run
           .withSuccessHandler(handleDocIdVerification)
           .verifyTemplateId({
