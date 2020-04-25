@@ -874,7 +874,6 @@
       function handleDocIdVerification(data) {
         const [error, info] = data;
         if (error) {
-          console.log(error);
           nextButton.disabled = true;
           appState.currentMerge.customAttachment = {
             ...appState.currentMerge.customAttachment,
@@ -962,7 +961,6 @@
           "#customAttachmentName"
         );
         if (e.target.value === "yes") {
-          console.log("toggle changed to yes, creating input group");
           if (!inputContainer && !attachmentNameContainer) {
             const [el, customName] = addAttachmentIdInput(attachmentIDEl);
             el.addEventListener("change", handleDocIdInput);
@@ -1006,9 +1004,6 @@
             'input[id^="attachmentId"]'
           );
           if (currentInputs.length === 0) {
-            console.log(
-              "in update inputs, current input length is 0, creating input"
-            );
             const [el, customName] = addAttachmentIdInput(attachmentIDEl);
             el.addEventListener("change", handleDocIdInput);
             el.value = appState.currentMerge.customAttachment.templateId;
