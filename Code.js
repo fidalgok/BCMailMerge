@@ -37,6 +37,7 @@ function verifyTemplateId({ templateId, elementId }) {
   try {
     const templateFile = DriveApp.getFileById(templateId);
     const mimeType = templateFile.getMimeType();
+    const fileName = templateFile.getName();
     // only supporting Google Docs and Google Slides at the moment. Throw an error
     // if they don't match up
     if (
@@ -46,7 +47,12 @@ function verifyTemplateId({ templateId, elementId }) {
       if (templateFile) {
         return [
           null,
-          { url: templateFile.getUrl(), fileType: mimeType, elementId },
+          {
+            url: templateFile.getUrl(),
+            fileType: mimeType,
+            elementId,
+            fileName,
+          },
         ];
       }
     }
@@ -333,21 +339,32 @@ function processRow(
   mergeData.htmlBody = emailText;
   if (rowData.cc != undefined) mergeData.cc = rowData.cc;
   if (rowData.bcc != undefined) mergeData.bcc = rowData.bcc;
-  if (kind === 'preview')
-    return {
+  if (kind === 'preview') {
+    // check for custom attachment and send back a preview of the attachment name for the preview
+    const processedPreview = {
       to: emailTo,
       subject: emailSubject,
       body: emailText,
       cc: mergeData.cc,
       bcc: mergeData.bcc,
     };
+    if (customAttachment) {
+      // just need the name for now
+      processedPreview.customAttachment = fillInTemplateFromObject(
+        customAttachment.fileName,
+        rowData
+      );
+    }
+    return processedPreview;
+  }
   if (customAttachment) {
     // request to create custom attachment(s)
     var customPDF = generateCustomPDF(
       customAttachment.type,
       customAttachment.templateId,
       headers,
-      rowData
+      rowData,
+      customAttachment.fileName
     );
   }
   if (sendDrafts === 'drafts') {
@@ -410,9 +427,11 @@ function generateCustomPDF(
     lastName: 'Fidalgo',
     seminarName: 'Test Webinar',
   };
-  const newTemplateName = templateName
-    ? fillInTemplateFromObject(templateName, mergeData)
-    : `${mergeData.firstName} ${mergeData.lastName} merge test`;
+  // make sure template name exists and isn't blank
+  const newTemplateName =
+    templateName && templateName.trim().length > 0
+      ? fillInTemplateFromObject(templateName, mergeData)
+      : `${mergeData.firstName} ${mergeData.lastName} merge test`;
 
   // need to open the template and get main slide
   // need to get parent folder so we know where to create documents

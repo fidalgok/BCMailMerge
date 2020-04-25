@@ -17,6 +17,7 @@
           type: "",
           includeAttachment: "no",
           templateId: "",
+          fileName: "",
         },
       },
       merges: [], // a list of merges created by user selecting
@@ -223,6 +224,17 @@
     // #endregion
     function sendMerge(kind) {
       // collect the data to send
+      const attachment =
+        appState.currentMerge.customAttachment &&
+        appState.currentMerge.customAttachment.includeAttachment === "yes"
+          ? {
+              templateId: appState.currentMerge.customAttachment.templateId,
+              type: appState.currentMerge.customAttachment.type,
+              fileName:
+                appState.currentMerge.customAttachment.fileName ||
+                appState.currentMerge.customAttachment.originalFileName,
+            }
+          : false;
       if (kind === "preview") {
         // console.log(appState)
         google.script.run
@@ -233,17 +245,10 @@
             appState.currentMerge.mergetype,
             appState.currentMerge.recipients,
             appState.currentMerge.mergetitle,
-            appState.mergeConditions
+            appState.mergeConditions,
+            attachment
           );
       } else if (kind === "merge") {
-        const attachment =
-          appState.currentMerge.customAttachment &&
-          appState.currentMerge.customAttachment.includeAttachment === "yes"
-            ? {
-                templateId: appState.currentMerge.customAttachment.templateId,
-                type: appState.currentMerge.customAttachment.type,
-              }
-            : false;
         google.script.run
           .withSuccessHandler(showConfirmationUI)
           .startStandardMerge(
@@ -890,6 +895,7 @@
             ...appState.currentMerge.customAttachment,
             isVerified: true,
             type: info.fileType,
+            originalFileName: info.fileName,
           };
           // TODO: update interface with success message
           // first clear errors if any
@@ -938,6 +944,12 @@
         });
       }
 
+      function handleNameChange(e) {
+        appState.currentMerge.customAttachment.fileName = e.target.value;
+        google.script.run.storeMailMerge({
+          currentMerge: JSON.stringify(appState.currentMerge),
+        });
+      }
       function handleToggleChange(e) {
         appState.currentMerge.customAttachment = {
           ...appState.currentMerge.customAttachment,
@@ -946,12 +958,15 @@
         const inputContainer = attachmentIDEl.querySelector(
           "#customAttachment"
         );
-
+        const attachmentNameContainer = attachmentIDEl.querySelector(
+          "#customAttachmentName"
+        );
         if (e.target.value === "yes") {
           console.log("toggle changed to yes, creating input group");
-          if (!inputContainer) {
-            const el = addAttachmentIdInput(attachmentIDEl);
+          if (!inputContainer && !attachmentNameContainer) {
+            const [el, customName] = addAttachmentIdInput(attachmentIDEl);
             el.addEventListener("change", handleDocIdInput);
+            customName.addEventListener("change", handleNameChange);
           }
           nextButton.disabled = true;
         } else {
@@ -959,12 +974,15 @@
           if (inputContainer) {
             attachmentIDEl.removeChild(inputContainer);
           }
-
+          if (attachmentNameContainer) {
+            attachmentIDEl.removeChild(attachmentNameContainer);
+          }
           // remove the docId from appstate
           appState.currentMerge.customAttachment = {
             includeAttachment: "no",
             templateId: "",
             type: "",
+            fileName: "",
           };
           nextButton.disabled = false;
         }
@@ -991,9 +1009,11 @@
             console.log(
               "in update inputs, current input length is 0, creating input"
             );
-            const el = addAttachmentIdInput(attachmentIDEl);
+            const [el, customName] = addAttachmentIdInput(attachmentIDEl);
             el.addEventListener("change", handleDocIdInput);
             el.value = appState.currentMerge.customAttachment.templateId;
+            customName.addEventListener("change", handleNameChange);
+            customName.value = appState.currentMerge.customAttachment.fileName;
             // need to verify the id again just in case
             google.script.run
               .withSuccessHandler(handleDocIdVerification)
@@ -1028,9 +1048,16 @@
                 <input type="text" id="attachmentId" name="attachment" />
                 <label for="attachmentId">Document ID</label>
               </div>
+              <div id="customAttachmentName" class="form__input-group">
+                <input type="text" id="attachmentId-name" name="documentName" placeholder="(Optional): Document keeps original name if custom name isn't entered"/>
+                <label for="attachmentId-name">Document Name</label>
+              </div>
           `
       );
-      return document.querySelector("#attachmentId");
+      return [
+        document.querySelector("#attachmentId"),
+        document.querySelector("#attachmentId-name"),
+      ];
     }
 
     // -----------------------------------//
@@ -1101,7 +1128,9 @@
                 ${message.body}
               </div>
               <div class="email-preview__attachments">
-                <p><span>Attachments</span>${attachments.join(", ")}</p>
+                <p><span>Attachments</span>${attachments.join(", ")} ${
+            message.customAttachment
+          }.pdf</p>
                 </div>
             </div>
           `;
