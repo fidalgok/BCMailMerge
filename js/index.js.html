@@ -818,8 +818,23 @@
                 </select>
                 <label for="columns-${id}">Column Header</label>
             </div>
-            <div>
-                  =
+            <div id="mergeComparison-${id}" class="form__input-group">
+              <select id="comparison-${id}" name="comparison">
+                <option value=" ">--Choose a Comparison--</option>
+                <optgroup label="Text">
+                  <option value="TextEquals">Equal to (match exactly)</option>
+                  <option value="TextNotEquals">Not equal to (match exactly)</option>
+                  <option value="TextEqualsIgnoreCase">Equal to (ignore case)</option>
+                  <option value="TextNotEqualsIgnoreCase">Not equal to (ignore case)</option>
+                </optgroup>
+                <optgroup label="Numbers">
+                  <option value="equals">Equal to</option>
+                  <option value="notEquals">Not equal to</option>
+                  <option value="lessThan">Less than</option>
+                  <option value="greaterThan">Greater than</option>
+                </optgroup>
+                </select>
+                <label for="comparison-${id}">Comparison Operator</label>
             </div>
             <div class="form__input-group">
               <input type="text" id="condition-${id}" name="condition" >
