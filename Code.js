@@ -1,10 +1,9 @@
-// Compiled using ts2gas 1.6.2 (TypeScript 3.6.4)
 var exports = exports || {};
 var module = module || { exports };
 var exports = exports || {};
 var module = module || { exports };
 const ss = SpreadsheetApp.getActiveSpreadsheet();
-// currently attached spreadsheet https://docs.google.com/spreadsheets/d/1xNCrpcp7Z_gu0YANrNeRsPPIBr2KYdNaGKLU2H9pQW8/edit#gid=0
+// currently attached spreadsheet https://docs.google.com/spreadsheets/d/19FDqOoJ5og-2cXs2zTy6kZ8FNz-vcdoPNgMSMq12uP0/
 function onInstall(e) {
   onOpen(e);
 }
@@ -29,6 +28,8 @@ function getAliases() {
   // provides a list of all aliases associated with the logged in user
   const data = {};
   data.aliases = GmailApp.getAliases();
+  var email = Session.getEffectiveUser().getEmail();
+  data.aliases.unshift(email);
   return data;
 }
 
@@ -80,11 +81,11 @@ function getUserDrafts(refresh) {
   }
   try {
     const drafts = GmailApp.getDrafts();
-    let messages = drafts.map(function(draft) {
+    let messages = drafts.map(function (draft) {
       // get attachments info separately
       const message = draft.getMessage();
       const attachments = getMessageAttachments(message);
-      const attachmentNames = attachments.attachments.map(function(attachment) {
+      const attachmentNames = attachments.attachments.map(function (attachment) {
         return attachment.name;
       });
       const rawContent = message.getRawContent();
@@ -173,7 +174,7 @@ function merge(
     // var emailTemplate = email.body.slice(0);
     if (matchedImgs && matchedImgs.length) {
       if (draft.inlinedImages.length) {
-        inlinedImages = draft.inlinedImages.reduce(function(accum, next) {
+        inlinedImages = draft.inlinedImages.reduce(function (accum, next) {
           const decoded = Utilities.base64Decode(next.content);
           const imageBlob = Utilities.newBlob(decoded);
           imageBlob.setName(next.id);
@@ -188,9 +189,9 @@ function merge(
       attachments:
         kind === 'preview'
           ? draft.attachments
-          : draft.attachments.map(function(attachment) {
-              return attachment.blob;
-            }),
+          : draft.attachments.map(function (attachment) {
+            return attachment.blob;
+          }),
       to: email.to,
       cc: email.cc,
       bcc: email.bcc,
@@ -219,43 +220,205 @@ function merge(
       remainingQuota: getRemainingDailyQuota(),
     };
     const { mergePreview } = mergePreviewObject;
-    const _loop_1 = function(i) {
+
+    function skipRow(email, mergeStatus, reasons = [], i) {
+      const reason = reasons.join(", ");
+      // add the row to the skipped row array
+      mergeInfo.skip.push({
+        email,
+        mergeStatus,
+        row: i + 2,
+        reason
+      });
+    }
+    const _loop_1 = function (i) {
       const rowData = objects[i];
-      // let mappedRow = [];
-      // for (const d in rowData){
-      //   mappedRow.push({[d]: (typeof rowData[d])});
-      // }
-      // Logger.log(mappedRow)
       let status = '';
+
+
       if (typeof rowData[mergeStatus] === 'string') {
         status = rowData[mergeStatus].toLowerCase();
       }
       if (status === 'done' || status === '0') {
         // row was already processed
-        mergeInfo.skip.push({
-          email: rowData[emailColumn],
-          mergeStatus: rowData[mergeStatus],
-        });
+        skipRow(rowData[emailColumn], rowData[mergeStatus], ['already processed'], i)
+
       } else {
         try {
+          // hang on to some common variables here. track whether all merge conditions are met
+          const reasonsSkipped = []; // track the reason for skipping if any
           let isMergeConditionMet = true;
+
+
           if (mergeConditions.length) {
-            mergeConditions.forEach(function(_a) {
+            mergeConditions.forEach(function (_a) {
               // condition contains a column to check and what should be in the cell to match
               // the condition
-              const { column } = _a;
-              const { condition } = _a;
+              const { column, comparison } = _a; // column to be compared against and the comparison chosen
+              const { condition } = _a; // text value from the form input on client side
+
               const normalizedColumn = normalizeHeader(column);
+              const cell = rowData[normalizedColumn]; // tired of typing this whole thing out.
               // TODO: need to do better type checking here
               // Cell data can contain number, booleans, dates, strings
-              if (rowData[normalizedColumn] != condition) {
-                // skip row, merge condition not met for one or more of the conditions set
-                isMergeConditionMet = false;
-                mergeInfo.skip.push({
-                  email: rowData[emailColumn],
-                  mergeStatus: rowData[mergeStatus],
-                });
+              // save variables that attempt to convert the data to a number for the number switch statements
+              const cellConvertedToNum = parseFloat(rowData[normalizedColumn]);
+              const conditionConvertedToNum = parseFloat(condition);
+              // This switch statement is only pushing rows into the skip category, the default is to send all merge data unless
+              // it sets the merge condition to false in the code below
+              switch (comparison) {
+                // cases come from js/index.js where we set the comparison select values
+                // #region Text Cases
+                case 'TextEquals': {
+                  if (rowData[normalizedColumn] !== condition) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} not exact match to ${condition}`)
+                  }
+                  break;
+                }
+                case 'TextNotEquals': {
+                  if (rowData[normalizedColumn] === condition) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} matched exactly ${condition}`)
+                  }
+                  break;
+                }
+                case 'TextEqualsIgnoreCase': {
+                  // // first check to see whether contents are of type string
+                  // if (typeof rowData[normalizedColumn] !== 'string') {
+                  //   isMergeConditionMet = false;
+                  //   reasonsSkipped.push(`${cell} did not match ${condition}`)
+                  //   break;
+                  // }
+
+                  if (rowData[normalizedColumn].toLowerCase() !== condition.toLowerCase()) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} did not match ${condition}`)
+                  }
+                  break;
+                }
+                case 'TextNotEqualsIgnoreCase': {
+                  // first check to see whether contents are of type string
+                  // if (typeof rowData[normalizedColumn] !== 'string') {
+                  //   isMergeConditionMet = false;
+                  //   reasonsSkipped.push(`${cell} was equal to ${condition}`)
+                  //   break;
+                  // }
+
+                  if (rowData[normalizedColumn].toLowerCase() === condition.toLowerCase()) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} was equal to ${condition}`)
+                  }
+                  break;
+                }
+                case 'TextIsEmpty': {
+
+                  const notEmpty = typeof rowData[normalizedColumn] === 'string' && rowData[normalizedColumn].trim().length !== 0
+                  //Logger.log({ notEmpty, header: normalizedColumn, data: rowData[normalizedColumn] })
+                  if (notEmpty) {
+                    // skip row, merge condition not met for one or more of the conditions set
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${column} was not empty`)
+                  }
+                  break;
+                }
+                case 'TextIsNotEmpty': {
+
+                  if (rowData[normalizedColumn] == undefined) {
+                    // skip row, merge condition not met for one or more of the conditions set
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} was empty`)
+                  } else if (typeof rowData[normalizedColumn] === 'string' && rowData[normalizedColumn].trim().length === 0) {
+                    // skip row, merge condition not met for one or more of the conditions set
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${column} was empty`)
+                  }
+                  break;
+                }
+                case 'TextContains': {
+                  const textFound = rowData[normalizedColumn].includes(condition);
+                  if (!textFound) {
+                    //skip, shouldn't be in the cell
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${condition} was not found  in ${cell}`)
+                  }
+                  break;
+                }
+                case 'TextDoesNotContain': {
+                  const textFound = rowData[normalizedColumn].includes(condition);
+                  if (textFound) {
+                    //skip, shouldn't be in the cell
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${condition} was found  in ${cell}`)
+                  }
+                  break;
+                }
+                // #endregion Text Cases
+                // #region Num Cases
+                case 'numEquals': {
+
+
+                  if (Number.isNaN(conditionConvertedToNum) || Number.isNaN(cellConvertedToNum)) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} or ${condition} could not be converted  to a number`)
+                    break;
+                  }
+                  if (cellConvertedToNum !== conditionConvertedToNum) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} did not equal ${condition}`)
+                  }
+                  break;
+                }
+                case 'numNotEquals': {
+
+                  if (Number.isNaN(conditionConvertedToNum) || Number.isNaN(cellConvertedToNum)) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} or ${condition} could not be converted  to a number`)
+                    break;
+                  }
+                  if (cellConvertedToNum === conditionConvertedToNum) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} did not equal ${condition}`)
+                  }
+                  break;
+                }
+                case 'numLessThan': {
+
+                  if (Number.isNaN(conditionConvertedToNum) || Number.isNaN(cellConvertedToNum)) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} or ${condition} could not be converted  to a number`)
+                    break;
+                  }
+                  if (cellConvertedToNum > conditionConvertedToNum) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} was greater than or equal to ${condition}`)
+                  }
+                  break;
+                }
+                case 'numGreaterThan': {
+
+                  if (Number.isNaN(conditionConvertedToNum) || Number.isNaN(cellConvertedToNum)) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} or ${condition} could not be converted  to a number`)
+                    break;
+                  }
+                  if (cellConvertedToNum < conditionConvertedToNum) {
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push(`${cell} was less than or equal to ${condition}`)
+                  }
+                  break;
+                }
+                // #endregion Num Cases
+                default: {
+
+                  if (rowData[normalizedColumn] != condition) {
+                    // skip row, merge condition not met for one or more of the conditions set
+                    isMergeConditionMet = false;
+                    reasonsSkipped.push('condition not met');
+                  }
+                }
               }
+
             });
           }
           if (isMergeConditionMet) {
@@ -280,12 +443,29 @@ function merge(
                 )
                 .setValue('Done')
                 .clearFormat()
+                .setBackground('#A3FFDF')
                 .setNote(new Date());
               mergeInfo.success.push({
                 email: rowData[emailColumn],
                 mergeStatus: rowData[mergeStatus],
               });
             }
+          } else {
+            // mergeCondition not met
+            if (kind !== 'preview') {
+              const dataRange = dataSheet
+                .getRange(
+                  i + 2,
+                  headers.indexOf(`Merge Status - ${mergeTitle}`) + 1
+                );
+              dataRange
+                .clearFormat()
+                .setBackground('#FFE3A3')
+              if (reasonsSkipped.length > 0) {
+                dataRange.setNote(reasonsSkipped.join(", "));
+              }
+            }
+            skipRow(rowData[emailColumn], rowData[mergeStatus], reasonsSkipped, i);
           }
         } catch (e) {
           dataSheet
@@ -294,7 +474,7 @@ function merge(
               headers.indexOf(`Merge Status - ${mergeTitle}`) + 1
             )
             .setValue('Error')
-            .setBackground('red')
+            .setBackground('#ffa7a2')
             .setNote(`${e.message} ${e.stack}`);
           mergeInfo.fail.push({
             email: rowData[emailColumn],
@@ -306,7 +486,7 @@ function merge(
     for (let i = 0; i < objects.length; ++i) {
       _loop_1(i);
     }
-    if (kind === 'preview') return mergePreviewObject;
+    if (kind === 'preview') return { mergePreviewObject, skipped: mergeInfo.skip };
     return { message: 'merge complete', mergeInfo };
   } catch (e) {
     return { error: e.message, stack: e.stack };
@@ -348,7 +528,9 @@ function processRow(
       cc: mergeData.cc,
       bcc: mergeData.bcc,
     };
+
     if (customAttachment) {
+
       // just need the name for now
       processedPreview.customAttachment = fillInTemplateFromObject(
         customAttachment.fileName,
@@ -359,6 +541,8 @@ function processRow(
   }
   if (customAttachment) {
     // request to create custom attachment(s)
+
+
     var customPDF = generateCustomPDF(
       customAttachment.type,
       customAttachment.templateId,
@@ -370,12 +554,12 @@ function processRow(
   if (sendDrafts === 'drafts') {
     GmailApp.createDraft(emailTo, emailSubject, emailText, {
       ...mergeData,
-      attachments: [...mergeData.attachments, customPDF],
+      attachments: customPDF ? [...mergeData.attachments, customPDF] : [...mergeData.attachments],
     });
   } else {
     GmailApp.sendEmail(emailTo, emailSubject, emailText, {
       ...mergeData,
-      attachments: [...mergeData.attachments, customPDF],
+      attachments: customPDF ? [...mergeData.attachments, customPDF] : [...mergeData.attachments],
     });
   }
 }
@@ -395,6 +579,7 @@ function fillInTemplateFromObject(template, data) {
   let email = template;
   // Search for all the variables to be replaced, for instance <<Column name>>
   const templateVars = template.match(/<<[^\>]+>>/g);
+
   if (templateVars != null) {
     // Replace variables from the template with the actual values from the data object.
     // If no value is available, replace with the empty string.

@@ -224,16 +224,17 @@
     // #endregion
     function sendMerge(kind) {
       // collect the data to send
+
       const attachment =
         appState.currentMerge.customAttachment &&
-        appState.currentMerge.customAttachment.includeAttachment === "yes"
+          appState.currentMerge.customAttachment.includeAttachment === "yes"
           ? {
-              templateId: appState.currentMerge.customAttachment.templateId,
-              type: appState.currentMerge.customAttachment.type,
-              fileName:
-                appState.currentMerge.customAttachment.fileName ||
-                appState.currentMerge.customAttachment.originalFileName,
-            }
+            templateId: appState.currentMerge.customAttachment.templateId,
+            type: appState.currentMerge.customAttachment.type,
+            fileName:
+              appState.currentMerge.customAttachment.fileName ||
+              appState.currentMerge.customAttachment.originalFileName,
+          }
           : false;
       if (kind === "preview") {
         // console.log(appState)
@@ -754,6 +755,7 @@
               conditionsDiv,
               condition.id,
               condition.column,
+              condition.comparison,
               condition.condition
             );
           }
@@ -769,24 +771,50 @@
         return array
           .map(
             (item) => `
-            <option value="${item}" ${
-              item === column ? 'selected="true"' : ""
-            }>${item}</option>
+            <option value="${item}" ${item === column ? 'selected="true"' : ""
+              }>${item}</option>
           `
           )
           .join("");
       }
+
       function handleChange(e) {
         const mergeCondition = appState.mergeConditions.find(
           (condition) => condition.id == e.target.id.split("-")[1]
         );
         mergeCondition[e.target.name] = e.target.value;
+        console.log(mergeCondition, appState.mergeConditions)
         google.script.run.storeMailMerge({
           mergeConditions: JSON.stringify(appState.mergeConditions),
         });
+        // based on condition change the input
+        if (e.target.id.startsWith('comparison')) {
+          // grab the text input so we can enable or disable it
+          const conditionInput = document.querySelector(`#condition-${e.target.id.split("-")[1]}`);
+
+          if (e.target.value == 'TextIsEmpty' || e.target.value == 'TextIsNotEmpty') {
+            // no need for the text input disable it
+            conditionInput.disabled = true;
+          } else {
+            conditionInput.disabled = false;
+          }
+        }
+        if (e.target.id.startsWith('condition') && mergeCondition.comparison.startsWith('num')) {
+          // comparing numbers check if user is actually putting in numbers and warn them if they don't
+          if (isNaN(parseFloat(e.target.value))) {
+            e.target.parentElement.querySelector('label').insertAdjacentHTML('beforeend', '<span class="error-message"> - Enter a valid number</span>')
+
+          } else {
+            // check to see if error message exists, if it does remove it
+            const el = e.target.parentElement.querySelector('.error-message');
+            if (el) {
+              el.remove();
+            }
+          }
+        }
       }
       function handleDelete(e) {
-        // TODO handle removing merge conditions
+
         const mergeConditionId = e.target.id.split("-")[1];
         const filteredMergeConditions = appState.mergeConditions.filter(
           (condition) => condition.id != mergeConditionId
@@ -796,7 +824,7 @@
           `#mergeCondition-${mergeConditionId}`
         );
         conditionsDiv.removeChild(mergeConditionContainer);
-        // console.log('removing merge condition',appState)
+
         google.script.run.storeMailMerge({
           mergeConditions: JSON.stringify(appState.mergeConditions),
         });
@@ -805,15 +833,17 @@
         parentDiv = conditionsDiv,
         id,
         column = "",
+        comparison = "",
         condition = ""
       ) {
+        console.log(comparison === 'TextEquals')
         parentDiv.insertAdjacentHTML(
           "beforeend",
           `
           <div class="condition-container" id="mergeCondition-${id}">
             <div id="mergeCondition-${id}" class="form__input-group">
               <select id="columns-${id}" name="column">
-                <option disabled value=" ">Add Condition to Column</option>
+                <option value=" ">--Select a column--</option>
                 ${generateOptions(appState.columnHeadings, column)}
                 </select>
                 <label for="columns-${id}">Column Header</label>
@@ -821,17 +851,21 @@
             <div id="mergeComparison-${id}" class="form__input-group">
               <select id="comparison-${id}" name="comparison">
                 <option value=" ">--Choose a Comparison--</option>
-                <optgroup label="Text">
-                  <option value="TextEquals">Equal to (match exactly)</option>
-                  <option value="TextNotEquals">Not equal to (match exactly)</option>
-                  <option value="TextEqualsIgnoreCase">Equal to (ignore case)</option>
-                  <option value="TextNotEqualsIgnoreCase">Not equal to (ignore case)</option>
+                <optgroup label="Text Comparison">
+                  <option value="TextEquals" ${comparison === 'TextEquals' && 'selected'}>Equal to (match exactly)</option>
+                  <option value="TextNotEquals" ${comparison === 'TextNotEquals' && 'selected'}>Not equal to (match exactly)</option>
+                  <option value="TextEqualsIgnoreCase" ${comparison === 'TextEqualsIgnoreCase' && 'selected'}>Equal to (ignore case)</option>
+                  <option value="TextNotEqualsIgnoreCase" ${comparison === 'TextNotEqualsIgnoreCase' && 'selected'}>Not equal to (ignore case)</option>
+                  <option value="TextContains" ${comparison === "TextContains" ? 'selected="true"' : ""}>Text contains</option>
+                  <option value="TextDoesNotContain" ${comparison === "TextDoesNotContain" ? 'selected="true"' : ""}>Text does not contain</option>
+                  <option value="TextIsEmpty" ${comparison === "TextIsEmpty" ? 'selected="true"' : ""}>Is Empty</option>
+                  <option value="TextIsNotEmpty" ${comparison === "TextIsNotEmpty" ? 'selected="true"' : ""}>Is Not Empty</option>
                 </optgroup>
-                <optgroup label="Numbers">
-                  <option value="equals">Equal to</option>
-                  <option value="notEquals">Not equal to</option>
-                  <option value="lessThan">Less than</option>
-                  <option value="greaterThan">Greater than</option>
+                <optgroup label="Number Comparison">
+                  <option value="numEquals" ${comparison === 'numEquals' && 'selected'}>Equal to</option>
+                  <option value="numNotEquals" ${comparison === 'numNotEquals' && 'selected'}>Not equal to</option>
+                  <option value="numLessThan" ${comparison === 'numLessThan' && 'selected'}>Less than</option>
+                  <option value="numGreaterThan" ${comparison === 'numGreaterThan' && 'selected'}>Greater than</option>
                 </optgroup>
                 </select>
                 <label for="comparison-${id}">Comparison Operator</label>
@@ -848,6 +882,8 @@
 
         const columnSelect = parentDiv.querySelector(`#columns-${id}`);
         columnSelect.addEventListener("change", handleChange);
+        const comparisonSelect = parentDiv.querySelector(`#comparison-${id}`);
+        comparisonSelect.addEventListener("change", handleChange);
         const conditionInput = parentDiv.querySelector(`#condition-${id}`);
         conditionInput.value = condition;
         conditionInput.addEventListener("change", handleChange);
@@ -1008,7 +1044,7 @@
       function updateInputs() {
         customDocToggles.forEach((toggle) => {
           toggle.value ===
-          appState.currentMerge.customAttachment.includeAttachment
+            appState.currentMerge.customAttachment.includeAttachment
             ? (toggle.checked = true)
             : (toggle.checked = false);
         });
@@ -1074,8 +1110,8 @@
     // Show the merge Preview -----------//
     // -----------------------------------//
 
-    function showPreviewUI(previewObj) {
-      // console.log(previewObj)
+    function showPreviewUI({ mergePreviewObject: previewObj, skipped, error, stack }) {
+      console.log(previewObj, skipped, error, stack)
       const messages = previewObj.mergePreview;
       const { attachments } = appState.currentMerge;
       const { remainingQuota } = previewObj;
@@ -1106,23 +1142,39 @@
           const nextButton = document.querySelector(".preview__action--next");
           nextButton.parentElement.removeChild(nextButton);
           const closeButtonHtml = `
-          <button onclick="google.script.host.close()" class="btn-primary">Close</button>
+          <button onclick="google.script.host.close()" class="btn-primary close">Close</button>
           `;
           actionDiv.insertAdjacentHTML("beforeend", closeButtonHtml);
           return;
         }
+        // check to see if we monkeyed around with the merge button...
+        const closeButton = document.querySelector('button.close');
+        if (closeButton) {
+          const actionDiv = document.querySelector(".preview__action");
+          closeButton.remove();
+          function handleTransition() {
+            document.querySelector('#preview').classList.toggle("ui-hidden");
+            document.querySelector('#confirmation').classList.toggle("ui-hidden");
+            handleLoading('confirmation')
+            sendMerge('merge');
+          }
+          const nextButtonHTML = `
+          <button class="btn-primary preview__action--next">Send Merge</button>
+          `;
+          actionDiv.insertAdjacentHTML("beforeend", nextButtonHTML);
+          actionDiv.querySelector('.btn-primary.preview__action--next').addEventListener('click', handleTransition)
+        }
         // previewContent is the preview div to dump the previews
         previewContent.innerHTML += `
-          <h2>Message Previews - Attempting ${messages.length} merge${
-          messages.length === 1 ? "" : "s"
-        } as ${
-          appState.currentMerge.mergetype === "drafts" ? "drafts" : "emails"
-        }</h2>
+          <h2>Message Previews - Attempting ${messages.length} merge${messages.length === 1 ? "" : "s"
+          } as ${appState.currentMerge.mergetype === "drafts" ? "drafts" : "emails"
+          }</h2>
           <p>You have ${remainingQuota} messages left to send today.</p>
 
         `;
 
         messages.forEach((message, i) => {
+          const customAttachment = message.customAttachment ? message.customAttachment.concat('.pdf') : '';
           const html = `
             <div class="email-preview">
               <h2>Message ${i + 1} of ${messages.length}</h2>
@@ -1138,9 +1190,8 @@
                 ${message.body}
               </div>
               <div class="email-preview__attachments">
-                <p><span>Attachments</span>${attachments.join(", ")} ${
-            message.customAttachment
-          }.pdf</p>
+                <p><span>Attachments</span>${attachments.join(", ")} ${customAttachment
+            }</p>
                 </div>
             </div>
           `;

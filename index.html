@@ -1,346 +1,281 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <base target="_top" />
 
-    <!-- Theme included stylesheets -->
+<head>
+  <base target="_top" />
 
-    <?!= HtmlService.createHtmlOutputFromFile('css/index.css.html').getContent() ?>
-    <link
-      href="https://fonts.googleapis.com/css?family=Work+Sans:400,600"
-      rel="stylesheet"
-    />
-  </head>
+  <!-- Theme included stylesheets -->
 
-  <body>
-    <div id="app">
-      <div id="start-page">
-        <div class="section">
-          <h1>Clinic Application Mail Merge</h1>
-          <p>
-            This mail merge app uses your Gmail drafts for email templates. The
-            headers found in this spreadsheet are used as template markers in
-            your mail merge. Feel free to create as many column headers as you'd
-            like.
-          </p>
-          <p>
-            If you don't have any drafts in your Gmail account go ahead and
-            create one before continuing.
-          </p>
-          <div class="cta">
-            <span>Skip the example 👉🏼</span
-            ><button
-              class="btn btn-primary"
-              id="configure-merge-info"
-              data-next="initial-ui"
-              data-current="start-page"
-            >
-              start merge
-            </button>
-          </div>
-        </div>
+  <?!= HtmlService.createHtmlOutputFromFile('css/index.css.html').getContent() ?>
+  <link href="https://fonts.googleapis.com/css?family=Work+Sans:400,600" rel="stylesheet" />
+</head>
 
-        <div class="section example">
-          <h2>Quick Example:</h2>
-          <p>
-            Let's say you have a header for the recipients first name. The
-            template marker for that field would use the following syntax:
-            &lt;&lt;First Name&gt;&gt;
-          </p>
-          <p>In your draft you would write something like the following:</p>
-          <div class="template-draft">
-            <p>Hi &lt;&lt;First Name&gt;&gt;,</p>
-            <p>
-              This is a custom email just for you! It can contain any kind of
-              information you wish.
-            </p>
-            <p>
-              Thanks for reading,<br /><br />Baldwin Eagle<br />eagleb@bc.edu
-            </p>
-          </div>
-          <p>
-            If the first recipient in your spreadsheet had the name "Jamie",
-            your merge would appear as follows:
-          </p>
-          <div class="template-draft">
-            <p>Hi Jamie,</p>
-            <p>
-              This is a custom email just for you! It can contain any kind of
-              information you wish.
-            </p>
-            <p>
-              Thanks for reading,<br /><br />Baldwin Eagle<br />eagleb@bc.edu
-            </p>
-          </div>
-        </div>
-        <div class="section final">
-          <h2>Learn More:</h2>
-          <p>
-            <a
-              href="https://bcwiki.bc.edu/pages/viewpage.action?pageId=17958153"
-              target="_blank"
-              >To get help or learn more about how to use the app check out the
-              BC Mail Merge wiki page.</a
-            >
-          </p>
-        </div>
-      </div>
-      <div
-        id="initial-ui"
-        class="ui-hidden"
-        data-next="conditions"
-        data-current="initial-ui"
-      >
-        <form id="draft-email">
-          <div class="form__section">
-            <h2>Select The Recipients Column</h2>
-            <p class="form__helper-text u-margin-none">
-              This column should contain the email addresses the merge job will
-              send the customized message.
-            </p>
-            <div class="form__input-group">
-              <select id="recipients" name="recipients">
-                <option value="">Choose recipients</option>
-              </select>
-              <label for="recipients">Recipients</label>
-            </div>
-          </div>
-          <div class="form__section">
-            <h2>Select Your Draft</h2>
-            <p class="form__helper-text u-margin-none">
-              If no drafts are found in your Gmail account, create a draft and
-              come back to configure your merge.
-            </p>
-            <div class="form__input-group">
-              <select id="userdrafts" name="userdrafts">
-                <option value="" id="drafts-loading"
-                  >Loading Drafts, please wait...</option
-                >
-              </select>
-              <label for="userdrafts">Gmail Drafts</label>
-            </div>
-
-            <button type="button" id="refresh-drafts" data-loading="false">
-              <span class="button-text">Refresh Drafts</span>
-              <div class="spinner-container">
-                <div class="spinner"></div>
-              </div>
-            </button>
-          </div>
-          <div class="form__section merge-title">
-            <h2>Merge Title</h2>
-            <p class="form__helper-text">
-              Merge titles will be used to keep track of individual merge jobs.
-            </p>
-            <button type="button" id="merge-jobs">Select Stored Merge</button>
-            <button type="button" id="new-merge">Create New Merge</button>
-            <div class="form__input-group merge-title"></div>
-          </div>
-
-          <!-- Show more info about the selected merge -->
-          <div class="form__section">
-            <h2 class="email-preview">Draft Preview</h2>
-            <p class="form__helper-text">
-              To edit the draft, open in your Gmail drafts and then make
-              required changes.
-            </p>
-
-            <div id="draft-preview">
-              <div class="draft-preview__to">
-                <span class="draft-preview__to-label">To</span>
-              </div>
-              <div class="draft-preview__cc">
-                <span class="draft-preview__cc-label">Cc</span>
-                <span class="cc__content"></span>
-              </div>
-              <div class="draft-preview__bcc">
-                <span class="draft-preview__bcc-label">Bcc</span>
-                <span class="bcc__content"></span>
-              </div>
-              <div class="draft-preview__subject">
-                <span class="draft-preview__subject-label">Subject</span>
-                <span class="subject__content"></span>
-              </div>
-
-              <div class="draft-preview__body">
-                <span class="draft-preview__body-label">Body</span>
-                <span class="body__content"></span>
-              </div>
-
-              <div class="draft-preview__attachments">
-                <span class="draft-preview__attachments-label"
-                  >Attachments:</span
-                >
-                <span class="attachments__content"></span>
-              </div>
-            </div>
-          </div>
-          <div class="form__section">
-            <h2>Merge Options</h2>
-            <div class="form__input-group form__radio-group">
-              <div>
-                <input
-                  type="radio"
-                  name="mergetype"
-                  id="drafts"
-                  value="drafts"
-                />
-                <label for="drafts">Create Gmail Drafts</label>
-              </div>
-              <div>
-                <input
-                  type="radio"
-                  name="mergetype"
-                  id="emails"
-                  value="emails"
-                  checked
-                />
-                <label for="emails">Send As Emails</label>
-              </div>
-            </div>
-            <div class="form__input-group">
-              <select id="alias" name="alias">
-                <option value="">Choose alias</option>
-                <option value="donotreply@bc.edu">donotreply@bc.edu</option>
-              </select>
-              <label for="alias">Aliases</label>
-            </div>
-          </div>
-          <div class="form__input-group form__submit">
-            <button type="submit">Continue</button>
-          </div>
-        </form>
-        <div>
-          <div id="merge-placeholders">
-            <h3>Mail merge placeholders</h3>
-            <p class="form__helper-text">
-              Copy and paste the placeholders below into your Gmail draft in
-              order to customize your messages for each recipient.
-            </p>
-          </div>
-          <div id="merge-titles">
-            <!-- If merge jobs were stored, add titles for user to copy into merge title input -->
-          </div>
+<body>
+  <div id="app">
+    <div id="start-page">
+      <div class="section">
+        <h1>Clinic Application Mail Merge</h1>
+        <p>
+          This mail merge app uses your Gmail drafts for email templates. The
+          headers found in this spreadsheet are used as template markers in
+          your mail merge. Feel free to create as many column headers as you'd
+          like.
+        </p>
+        <p>
+          If you don't have any drafts in your Gmail account go ahead and
+          create one before continuing.
+        </p>
+        <div class="cta">
+          <span>Skip the example 👉🏼</span><button class="btn btn-primary" id="configure-merge-info"
+            data-next="initial-ui" data-current="start-page">
+            start merge
+          </button>
         </div>
       </div>
 
-      <!-- Configure Merge conditions if any-->
-
-      <div id="conditions" class="ui-hidden">
-        <div class="conditions__action">
-          <button
-            data-next="initial-ui"
-            data-current="conditions"
-            class="condition__action--previous"
-          >
-            Edit Merge
-          </button>
-          <button
-            data-next="attachments"
-            data-current="conditions"
-            class="btn-primary condition__action--next"
-          >
-            Next Step
-          </button>
-        </div>
-        <div class="form__section">
-          <h2>Set Merge Conditions (Optional)</h2>
-          <p class="form__helper-text u-margin-none">
-            If you'd like to send messages if a certain condition is met, create
-            them here. Messages will only send if a condition is matched. If you
-            want to send to all recipients in the list continue to the merge
-            preview.
+      <div class="section example">
+        <h2>Quick Example:</h2>
+        <p>
+          Let's say you have a header for the recipients first name. The
+          template marker for that field would use the following syntax:
+          &lt;&lt;First Name&gt;&gt;
+        </p>
+        <p>In your draft you would write something like the following:</p>
+        <div class="template-draft">
+          <p>Hi &lt;&lt;First Name&gt;&gt;,</p>
+          <p>
+            This is a custom email just for you! It can contain any kind of
+            information you wish.
           </p>
-          <p class="form__helper-text">
-            Choose the column you'd like to match the condition on. Conditions
-            are case sensitive so make sure you are matching the case and
-            spelling exactly.
+          <p>
+            Thanks for reading,<br /><br />Baldwin Eagle<br />eagleb@bc.edu
           </p>
         </div>
-        <div id="merge-conditions">
-          <div>
-            <button id="add-condition">Add Merge Condition</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Custom Attachments -->
-
-      <div id="attachments" class="ui-hidden">
-        <div class="attachments__action">
-          <button
-            data-next="conditions"
-            data-current="attachments"
-            class="attachments__action--previous"
-          >
-            Edit Conditions
-          </button>
-          <button
-            data-next="preview"
-            data-current="attachments"
-            class="btn-primary attachments__action--next"
-          >
-            Preview Merge
-          </button>
-        </div>
-        <div class="form__section">
-          <h2>Create Custom Attachments (Optional)</h2>
-          <p class="form__helper-text u-margin-none">
-            If you would like to create custom attachments for recipients enter
-            the document ID here.
+        <p>
+          If the first recipient in your spreadsheet had the name "Jamie",
+          your merge would appear as follows:
+        </p>
+        <div class="template-draft">
+          <p>Hi Jamie,</p>
+          <p>
+            This is a custom email just for you! It can contain any kind of
+            information you wish.
+          </p>
+          <p>
+            Thanks for reading,<br /><br />Baldwin Eagle<br />eagleb@bc.edu
           </p>
         </div>
-        <div id="attachmentIds">
-          <div class="form__input-group form__radio-group">
-            <div>
-              <input
-                type="radio"
-                id="customAttachmentNo"
-                name="customAttachmentRadio"
-                value="no"
-                checked
-              />
-              <label for="customAttachmentNo">No</label>
-            </div>
-            <div>
-              <input
-                type="radio"
-                id="customAttachmentYes"
-                name="customAttachmentRadio"
-                value="yes"
-              />
-              <label for="customAttachmentYes">Yes</label>
-            </div>
-          </div>
-        </div>
       </div>
-
-      <!-- Mail Merge Preview  -->
-
-      <div id="preview" class="ui-hidden">
-        <div class="preview__action">
-          <button
-            data-next="attachments"
-            data-current="preview"
-            class="preview__action--previous"
-          >
-            Edit Custom Attachment
-          </button>
-          <button
-            data-next="confirmation"
-            data-current="preview"
-            class="btn-primary preview__action--next"
-          >
-            Send Merge
-          </button>
-        </div>
-        <div id="output" class="preview__output"></div>
-      </div>
-      <!-- Mail Merge Confirmation -->
-      <div id="confirmation" class="ui-hidden">
-        <div id="confirmation__content"></div>
+      <div class="section final">
+        <h2>Learn More:</h2>
+        <p>
+          <a href="https://bcwiki.bc.edu/pages/viewpage.action?pageId=17958153" target="_blank">To get help or learn
+            more about how to use the app check out the
+            BC Mail Merge wiki page.</a>
+        </p>
       </div>
     </div>
-    <?!= include('js/index.js.html'); ?>
-  </body>
+    <div id="initial-ui" class="ui-hidden" data-next="conditions" data-current="initial-ui">
+      <form id="draft-email">
+        <div class="form__section">
+          <h2>Select The Recipients Column</h2>
+          <p class="form__helper-text u-margin-none">
+            This column should contain the email addresses the merge job will
+            send the customized message.
+          </p>
+          <div class="form__input-group">
+            <select id="recipients" name="recipients">
+              <option value="">Choose recipients</option>
+            </select>
+            <label for="recipients">Recipients</label>
+          </div>
+        </div>
+        <div class="form__section">
+          <h2>Select Your Draft</h2>
+          <p class="form__helper-text u-margin-none">
+            If no drafts are found in your Gmail account, create a draft and
+            come back to configure your merge.
+          </p>
+          <div class="form__input-group">
+            <select id="userdrafts" name="userdrafts">
+              <option value="" id="drafts-loading">Loading Drafts, please wait...</option>
+            </select>
+            <label for="userdrafts">Gmail Drafts</label>
+          </div>
+
+          <button type="button" id="refresh-drafts" data-loading="false">
+            <span class="button-text">Refresh Drafts</span>
+            <div class="spinner-container">
+              <div class="spinner"></div>
+            </div>
+          </button>
+        </div>
+        <div class="form__section merge-title">
+          <h2>Merge Title</h2>
+          <p class="form__helper-text">
+            Merge titles will be used to keep track of individual merge jobs.
+          </p>
+          <button type="button" id="merge-jobs">Select Stored Merge</button>
+          <button type="button" id="new-merge">Create New Merge</button>
+          <div class="form__input-group merge-title"></div>
+        </div>
+
+        <!-- Show more info about the selected merge -->
+        <div class="form__section">
+          <h2 class="email-preview">Draft Preview</h2>
+          <p class="form__helper-text">
+            To edit the draft, open in your Gmail drafts and then make
+            required changes.
+          </p>
+
+          <div id="draft-preview">
+            <div class="draft-preview__to">
+              <span class="draft-preview__to-label">To</span>
+            </div>
+            <div class="draft-preview__cc">
+              <span class="draft-preview__cc-label">Cc</span>
+              <span class="cc__content"></span>
+            </div>
+            <div class="draft-preview__bcc">
+              <span class="draft-preview__bcc-label">Bcc</span>
+              <span class="bcc__content"></span>
+            </div>
+            <div class="draft-preview__subject">
+              <span class="draft-preview__subject-label">Subject</span>
+              <span class="subject__content"></span>
+            </div>
+
+            <div class="draft-preview__body">
+              <span class="draft-preview__body-label">Body</span>
+              <span class="body__content"></span>
+            </div>
+
+            <div class="draft-preview__attachments">
+              <span class="draft-preview__attachments-label">Attachments:</span>
+              <span class="attachments__content"></span>
+            </div>
+          </div>
+        </div>
+        <div class="form__section">
+          <h2>Merge Options</h2>
+          <div class="form__input-group form__radio-group">
+            <div>
+              <input type="radio" name="mergetype" id="drafts" value="drafts" />
+              <label for="drafts">Create Gmail Drafts</label>
+            </div>
+            <div>
+              <input type="radio" name="mergetype" id="emails" value="emails" checked />
+              <label for="emails">Send As Emails</label>
+            </div>
+          </div>
+          <div class="form__input-group">
+            <select id="alias" name="alias">
+              <option value="">Choose alias</option>
+              <option value="donotreply@bc.edu">donotreply@bc.edu</option>
+            </select>
+            <label for="alias">Aliases</label>
+          </div>
+        </div>
+        <div class="form__input-group form__submit">
+          <button type="submit">Continue</button>
+        </div>
+      </form>
+      <div>
+        <div id="merge-placeholders">
+          <h3>Mail merge placeholders</h3>
+          <p class="form__helper-text">
+            Copy and paste the placeholders below into your Gmail draft in
+            order to customize your messages for each recipient.
+          </p>
+        </div>
+        <div id="merge-titles">
+          <!-- If merge jobs were stored, add titles for user to copy into merge title input -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Configure Merge conditions if any-->
+
+    <div id="conditions" class="ui-hidden">
+      <div class="conditions__action">
+        <button data-next="initial-ui" data-current="conditions" class="condition__action--previous">
+          Edit Merge
+        </button>
+        <button data-next="attachments" data-current="conditions" class="btn-primary condition__action--next">
+          Next Step
+        </button>
+      </div>
+      <div class="form__section">
+        <h2>Set Merge Conditions (Optional)</h2>
+        <p class="form__helper-text u-margin-none">
+          If you'd like to send messages if a certain condition is met, create
+          them here. Messages will only send if a condition is matched. If you
+          want to send to all recipients in the list continue to the merge
+          preview.
+        </p>
+        <p class="form__helper-text">
+          Choose the column you'd like to match the condition on. Choose how you'd like to check for that condition.
+          Finally, if applicable enter the condition to check for.
+        </p>
+      </div>
+      <div id="merge-conditions">
+        <div>
+          <button id="add-condition">Add Merge Condition</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Attachments -->
+
+    <div id="attachments" class="ui-hidden">
+      <div class="attachments__action">
+        <button data-next="conditions" data-current="attachments" class="attachments__action--previous">
+          Edit Conditions
+        </button>
+        <button data-next="preview" data-current="attachments" class="btn-primary attachments__action--next">
+          Preview Merge
+        </button>
+      </div>
+      <div class="form__section">
+        <h2>Create Custom Attachments (Optional)</h2>
+        <p class="form__helper-text u-margin-none">
+          If you would like to create custom attachments for recipients enter
+          the document ID here.
+        </p>
+      </div>
+      <div id="attachmentIds">
+        <div class="form__input-group form__radio-group">
+          <div>
+            <input type="radio" id="customAttachmentNo" name="customAttachmentRadio" value="no" checked />
+            <label for="customAttachmentNo">No</label>
+          </div>
+          <div>
+            <input type="radio" id="customAttachmentYes" name="customAttachmentRadio" value="yes" />
+            <label for="customAttachmentYes">Yes</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mail Merge Preview  -->
+
+    <div id="preview" class="ui-hidden">
+      <div class="preview__action">
+        <button data-next="attachments" data-current="preview" class="preview__action--previous">
+          Edit Custom Attachment
+        </button>
+        <button data-next="confirmation" data-current="preview" class="btn-primary preview__action--next">
+          Send Merge
+        </button>
+      </div>
+      <div id="output" class="preview__output"></div>
+    </div>
+    <!-- Mail Merge Confirmation -->
+    <div id="confirmation" class="ui-hidden">
+      <div id="confirmation__content"></div>
+    </div>
+  </div>
+  <?!= include('js/index.js.html'); ?>
+</body>
+
 </html>

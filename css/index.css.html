@@ -211,15 +211,20 @@
     border-radius: 2px;
   }
 
+  .form__input-group input[type="text"]:disabled {
+    cursor: not-allowed;
+
+  }
+
   .form__input-group label {
     margin-bottom: 10px;
     display: block;
     transition: color 0.1s linear;
   }
 
-  input:focus ~ label,
-  select:focus ~ label,
-  #editor:focus-within ~ label {
+  input:focus~label,
+  select:focus~label,
+  #editor:focus-within~label {
     color: var(--color-primary);
   }
 
@@ -325,6 +330,7 @@
     animation-duration: 1s;
     animation-delay: 0.15s;
   }
+
   .form__input-group .message__success,
   .form__section .message__success {
     display: block;
@@ -359,6 +365,7 @@
   }
 
   @keyframes shake {
+
     from,
     to {
       -webkit-transform: translate3d(0, 0, 0);
@@ -403,6 +410,7 @@
     justify-items: center;
     grid-gap: 1rem;
   }
+
   #merge-conditions .form__input-group {
     justify-self: stretch;
   }
@@ -410,6 +418,10 @@
   #merge-conditions .form__input-group input,
   #merge-conditions .form__input-group select {
     width: 100%;
+  }
+
+  #merge-conditions .form__input-group span.error-message {
+    color: var(--color-warning);
   }
 
   #add-condition {
@@ -552,7 +564,7 @@
     animation: spinnerLeftRight 0.6s infinite;
   }
 
-  .spinner + label {
+  .spinner+label {
     margin-top: 8px;
     display: inline-block;
     text-transform: uppercase;
@@ -582,6 +594,10 @@
     width: 100vw;
     place-items: center center;
     pointer-events: none;
+  }
+
+  div#app+.loading {
+    background: white;
   }
 
   .loading.initial-ui {
