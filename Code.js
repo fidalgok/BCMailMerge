@@ -3,7 +3,7 @@ var module = module || { exports };
 var exports = exports || {};
 var module = module || { exports };
 const ss = SpreadsheetApp.getActiveSpreadsheet();
-// currently attached spreadsheet https://docs.google.com/spreadsheets/d/19FDqOoJ5og-2cXs2zTy6kZ8FNz-vcdoPNgMSMq12uP0/
+// currently attached spreadsheet https://docs.google.com/spreadsheets/d/1xNCrpcp7Z_gu0YANrNeRsPPIBr2KYdNaGKLU2H9pQW8
 function onInstall(e) {
   onOpen(e);
 }
