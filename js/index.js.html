@@ -1491,14 +1491,9 @@
       appState.currentSheet = currentSheet;
       appState.mergeConditions = mergeConditions;
       appState.currentMerge = currentMerge;
+      appState.currentMerge.currentSheet = currentSheet;
       appState.merges = merges;
-      // quick bit of housekeeping to make sure the app cache on both the local
-      // and Script side is current 
-      // appState.currentMerge.currentSheet = appState.currentMerge.currentSheet ?? currentSheet;
-      // appState.mergeConditions = mergeConditions.map((condition) => {
-      //   condition.currentSheet = condition.currentSheet ?? appState.currentSheet;
-      //   return condition;
-      // });
+
       // update the necessary form on the merge options screen
       console.log({ currentSheet, mergeInfo, appState })
       updatePlaceholders(headings);
