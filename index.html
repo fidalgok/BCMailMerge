@@ -12,9 +12,9 @@
 
 <body>
   <div id="app">
-    <div id="start-page">
+    <div id="startPage" class="ui-hidden">
       <div class="section">
-        <h1>Clinic Application Mail Merge</h1>
+        <h1>Boston College Mail Merge</h1>
         <p>
           This mail merge app uses your Gmail drafts for email templates. The
           headers found in this spreadsheet are used as template markers in
@@ -27,7 +27,7 @@
         </p>
         <div class="cta">
           <span>Skip the example 👉🏼</span><button class="btn btn-primary" id="configure-merge-info"
-            data-next="initial-ui" data-current="start-page">
+            data-next="mergeOptions" data-current="startPage">
             start merge
           </button>
         </div>
@@ -75,7 +75,7 @@
         </p>
       </div>
     </div>
-    <div id="initial-ui" class="ui-hidden" data-next="conditions" data-current="initial-ui">
+    <div id="mergeOptions" class="ui-hidden" data-next="conditions" data-current="mergeOptions">
       <form id="draft-email">
         <div class="form__section">
           <h2>Select The Recipients Column</h2>
@@ -198,7 +198,7 @@
 
     <div id="conditions" class="ui-hidden">
       <div class="conditions__action">
-        <button data-next="initial-ui" data-current="conditions" class="condition__action--previous">
+        <button data-next="mergeOptions" data-current="conditions" class="condition__action--previous">
           Edit Merge
         </button>
         <button data-next="attachments" data-current="conditions" class="btn-primary condition__action--next">

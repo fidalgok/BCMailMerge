@@ -10,7 +10,7 @@
     // set up some state for the app
     const appState = {
       currentMerge: {
-        mergetitle: "",
+        mergeTitle: "",
         draftId: "",
         mergeId: "",
         customAttachment: {
@@ -26,7 +26,7 @@
       mergeConditions: [],
       columnHeadings: [],
       currentPage: 0,
-      pages: ["start-page", "initial-ui", "conditions", "preview"], // dictates how you progress through the screens
+      pages: ["startPage", "mergeOptions", "conditions", "attachments", "preview", "confirmation"], // dictates how you progress through the screens
     };
 
     appState.draftForm = document.querySelector("#draft-email");
@@ -208,7 +208,7 @@
     const startButton = document.getElementById("configure-merge-info");
     startButton.addEventListener("click", (e) => {
       handleTransition(startButton.dataset.current, startButton.dataset.next);
-      if (!appState.drafts.length) handleLoading("initial-ui");
+      if (!appState.drafts.length) handleLoading("mergeOptions");
     });
 
     const conditionButtons = document.querySelectorAll(
@@ -224,9 +224,16 @@
     // #endregion
     function sendMerge(kind) {
       // collect the data to send
-
+      console.log({ sending: kind, appState })
+      const date = new Date();
+      // Results below assume UTC timezone - your results may vary
+      const dateOptions = {
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric',
+      }
+      const formattedDate = new Intl.DateTimeFormat('en-US', dateOptions).format(date).replace(/,/, '');
       const attachment =
-        appState.currentMerge.customAttachment &&
+        appState?.currentMerge?.customAttachment &&
           appState.currentMerge.customAttachment.includeAttachment === "yes"
           ? {
             templateId: appState.currentMerge.customAttachment.templateId,
@@ -234,55 +241,78 @@
             fileName:
               appState.currentMerge.customAttachment.fileName ||
               appState.currentMerge.customAttachment.originalFileName,
+            originalFileName: appState.currentMerge.customAttachment.originalFileName
           }
           : false;
+
+      // need to double check if appState.email exists
+      let email = appState.drafts.find(
+        (draft) => draft.id === appState.currentMerge.draftId
+      );
+      email.from = appState.currentMerge.alias;
+      console.log({ email, merge: appState.currentMerge, conditions: appState.mergeConditions });
       if (kind === "preview") {
         // console.log(appState)
+
         google.script.run
           .withSuccessHandler(showPreviewUI)
           .startStandardMerge(
-            appState.email,
+            email,
             "preview",
-            appState.currentMerge.mergetype,
+            appState.currentMerge.mergeType,
             appState.currentMerge.recipients,
-            appState.currentMerge.mergetitle,
+            appState.currentMerge.mergeTitle,
             appState.mergeConditions,
-            attachment
+            attachment,
+            formattedDate
           );
       } else if (kind === "merge") {
         google.script.run
           .withSuccessHandler(showConfirmationUI)
           .startStandardMerge(
-            appState.email,
+            email,
             "merge",
-            appState.currentMerge.mergetype,
+            appState.currentMerge.mergeType,
             appState.currentMerge.recipients,
-            appState.currentMerge.mergetitle,
+            appState.currentMerge.mergeTitle,
             appState.mergeConditions,
-            attachment
+            attachment,
+            formattedDate
           );
       }
     }
 
     function logScriptCache(data) {
       // temporary code to test dataStorage
-      // console.log('data from scriptCache')
-      // console.log({ ...data, merges: JSON.parse(data.merges), currentMerge: JSON.parse(data.currentMerge) });
+      console.log('data from scriptCache')
+      console.log({ ...data, merges: data.merges ? JSON.parse(data.merges) : [], currentMerge: data.currentMerge ? JSON.parse(data.currentMerge) : {} });
     }
 
     function handleInput(e) {
       const parent = e.target.parentElement;
       const hasError = parent.querySelector(".message__error");
       // have to do some weird stuff to handle the mergetitle case...
-      if (e.target.name === "mergetitle") {
+      console.log({ event: 'input', name: e.target.name, value: e.target.value })
+      if (e.target.name === "mergeTitle") {
+        // check for any errors already on the form input
         const mergeTitleError = document.querySelector(
           ".form__section.merge-title .message__error"
         );
         if (mergeTitleError) {
           mergeTitleError.parentElement.removeChild(mergeTitleError);
         }
+        appState.currentMerge.mergeTitle = e.target.value;
+        google.script.run.withSuccessHandler(logScriptCache).storeMailMerge({
+          currentMerge: JSON.stringify(appState.currentMerge),
+          merges: JSON.stringify(appState.merges.map(merge => {
+            if (merge.mergeId === appState.currentMerge.mergeId) {
+              return appState.currentMerge;
+            }
+            return merge;
+          }))
+        });
       }
-      if (hasError && e.target.name !== "mergetitle") {
+      if (hasError && e.target.name !== "mergeTitle") {
         parent.removeChild(hasError);
       }
       const errors = Object.entries(validateFields([e.target]));
@@ -298,7 +328,7 @@
     function handleChange(e) {
       const parent = e.target.parentElement;
       const hasError = parent.querySelector(".message__error");
-
+      console.log({ name: e.target.name, value: e.target.value })
       if (e && e.target.id === "userdrafts") {
         if (hasError) {
           appState.currentMerge.draftId = null;
@@ -309,6 +339,12 @@
           e.target.selectedOptions[0].dataset.mergeid;
         google.script.run.withSuccessHandler(logScriptCache).storeMailMerge({
           currentMerge: JSON.stringify(appState.currentMerge),
+          merges: JSON.stringify(appState.merges.map(merge => {
+            if (merge.mergeId === appState.currentMerge.mergeId) {
+              return appState.currentMerge;
+            }
+            return merge;
+          }))
         });
         updateDraftPreview();
         return;
@@ -317,6 +353,12 @@
       appState.currentMerge[e.target.name] = e.target.value;
       google.script.run.withSuccessHandler(logScriptCache).storeMailMerge({
         currentMerge: JSON.stringify(appState.currentMerge),
+        merges: JSON.stringify(appState.merges.map(merge => {
+          if (merge.mergeId === appState.currentMerge.mergeId) {
+            return appState.currentMerge;
+          }
+          return merge;
+        }))
       });
     }
 
@@ -388,7 +430,7 @@
           option.value = title.slice(15);
           select.add(option);
         });
-        select.name = "mergetitle";
+        select.name = "mergeTitle";
         select.id = "mergetitle";
         inputGroup.innerHTML = "";
         inputGroup.appendChild(select);
@@ -400,17 +442,19 @@
         );
         // set up event listeners for newly created input
         select.addEventListener("input", handleInput);
-        select.addEventListener("change", handleChange);
+
         // if merge title exists in appState.currentMerge, set it to the selected option
-        if (appState.currentMerge.mergetitle) {
+        console.log('select current merge title if exists')
+        console.log(appState.currentMerge)
+        if (appState.currentMerge.mergeTitle) {
           const option = [...select.options].find(
-            (option) => option.value === appState.currentMerge.mergetitle
+            (option) => option.value === appState.currentMerge.mergeTitle
           );
           if (option) option.selected = true;
         }
       } else if (e && e.target.id === "new-merge") {
         const html = `
-          <input type="text" name="mergetitle" id="mergetitle" placeholder="Enter a merge title">
+          <input type="text" name="mergeTitle" id="mergetitle" placeholder="Enter a merge title">
               <label for="mergetitle">Create Merge Title</label>
           `;
         inputGroup.innerHTML = html;
@@ -421,26 +465,7 @@
       appState.draftForm = document.querySelector("#draft-email");
     }
 
-    // check script cache to see if any merge data has been saved which kicks off
-    // process of setting up the application.
 
-    google.script.run.withSuccessHandler(initApp).checkEmailColumn();
-    google.script.run.withSuccessHandler(updateAliases).getAliases();
-    google.script.run.withSuccessHandler(updateDraftMessages).getUserDrafts();
-
-    function initApp([data]) {
-      // need to check merges array for headers starting with merge status
-      const headings = data.filter(
-        (header) => !header.startsWith("Merge Status - ")
-      );
-      const mergeTitles = data.filter((header) =>
-        header.startsWith("Merge Status - ")
-      );
-      appState.mergeTitles = mergeTitles;
-      appState.columnHeadings = headings;
-      updatePlaceholders(headings);
-      updateRecipients(headings);
-    }
 
     function updatePlaceholders(headings) {
       const previewContent = document.getElementById("merge-placeholders");
@@ -452,29 +477,40 @@
 
     function updateRecipients(headings) {
       const recipientsSelect = document.querySelector("#recipients");
+      let mergeRecipientMatch = false;
+      const currentMerge = appState.currentMerge;
       headings.forEach((heading) => {
+
         const option = document.createElement("option");
         option.text = heading;
         option.value = heading;
-        if (heading.toLowerCase().match("email")) {
-          appState.currentMerge.recipients = heading;
+        if (heading.toLowerCase() === appState?.currentMerge?.recipients?.toLowerCase()) {
           option.selected = true;
+          mergeRecipientMatch = true;
+        } else if (heading.toLowerCase().includes('email') && !mergeRecipientMatch) {
+          mergeRecipientMatch = true;
+          option.selected = true;
+          currentMerge.recipients = heading;
         }
         recipientsSelect.add(option);
       });
+
     }
 
-    function updateAliases({ aliases }) {
+    function updateAliases(aliases) {
       const aliasSelect = document.querySelector("#alias");
       aliases.forEach((alias) => {
         const option = document.createElement("option");
         option.text = alias;
         option.value = alias;
+        if (alias === appState?.currentMerge?.alias) {
+          option.selected = true;
+        }
         aliasSelect.add(option);
       });
     }
 
-    function updateDraftMessages({ drafts, error, refresh }) {
+    function updateDraftMessages({ drafts, error, refresh }, scriptCache) {
       handleLoading(null, "cancel");
       if (error) {
         console.error(error.message);
@@ -503,10 +539,8 @@
         draftSelect.add(option);
       });
       // should have all data now to set up the form... don't refresh everything if user is just refreshing drafts
-      if (!refresh)
-        google.script.run
-          .withSuccessHandler(updateFormWithCachedData)
-          .getMailMerge();
+      if (!refresh) updateFormWithCachedData(scriptCache);
+
       if (refresh) {
         // reselect the current draft if one was selected before
         const el = document.querySelector(
@@ -567,53 +601,39 @@
       });
     }
 
-    function updateFormWithCachedData({ error, data }, form) {
+    function updateFormWithCachedData({ error }, form) {
+      //TODO: Fix for last current merge on the given sheet
       if (error) return console.error(error);
-      if (typeof data.merges === "string") {
-        // checking for data from google backend, have to parse some JSON first
-        // otherwise data coming in is as I expect it
-        appState.merges = data.merges ? JSON.parse(data.merges) : [];
-        appState.currentMerge = data.currentMerge
-          ? JSON.parse(data.currentMerge)
-          : {};
-        appState.currentMerge.attachments =
-          data.currentMerge && data.currentMerge.attachments
-            ? JSON.parse(data.currentMerge.attachments)
-            : [];
-      }
+
       // check for stored merges array and that it has data in it
       if (
         appState.merges &&
         appState.merges.length &&
         typeof appState.merges !== "string"
       ) {
-        const merge = appState.merges.filter(
-          (el) =>
-            // find the current merge
-            el.mergeId === appState.currentMerge.mergeId
-        );
+        const merge = appState.currentMerge;
 
-        if (merge && merge.length && merge[0].fields) {
-          for (field in merge[0].fields) {
+        if (merge && merge.fields) {
+          for (field in merge.fields) {
             const el = document.querySelector(
               `[name="${field.toLowerCase()}"]`
             );
             if (!el) continue;
             if (el.type === "radio") {
               document.querySelector(
-                `#${merge[0].fields[field]}`
+                `#${merge.fields[field]}`
               ).checked = true;
               // el.checked = true;
               continue;
             }
 
-            el.value = merge[0].fields[field];
+            el.value = merge.fields[field];
           }
         }
       }
       if (appState.currentMerge.draftId) {
         // create the select for drafts and set the selected option of the draftId from the last run merge
-        showMergeTitles();
+
         const el = document.querySelector(
           `[data-mergeId="${appState.currentMerge.draftId}"]`
         );
@@ -622,9 +642,7 @@
           updateDraftPreview();
         }
       }
-      if (data.mergeConditions) {
-        appState.mergeConditions = JSON.parse(data.mergeConditions);
-      }
+
     }
 
     function resetForm() {
@@ -685,36 +703,76 @@
       );
       if (mergeFound) {
         // a merge exists, update the current merge information with the data from the form
+        console.log('merge was found current state before map')
+        console.log({ merges: appState.merges, currentMerge: appState.currentMerge })
         appState.merges = appState.merges.map((merge) => {
           if (merge.mergeId === mergeId) {
             merge.fields = {
               recipients: formData.recipients,
               mergeType: formData.mergetype,
-              mergeTitle: formData.mergetitle,
+              mergeTitle: formData.mergetitle || formData.mergeTitle,
               alias: formData.alias,
             };
             merge.draftId = appState.currentMerge.draftId;
             merge.mergeId = mergeId;
             merge.attachments = email.attachments || [];
+            merge.currentSheet = appState.currentSheet;
+            merge.current = true;
+            merge.recipients = formData.recipients;
+            merge.mergeType = formData.mergetype || formData.mergeType;
+            merge.mergeTitle = formData.mergeTitle;
+            merge.alias = formData.alias;
             return merge;
+          } else if (merge.currentSheet === appState.currentSheet) {
+
+            return { ...merge, current: false };
           }
           return merge;
         });
+        console.log('merge was found current state after map')
+        console.log({ merges: appState.merges, currentMerge: appState.currentMerge })
       } else {
         // merge doesn't exist yet, add the merge to the list of merges ran by the user
         appState.merges.push({
+          currentSheet: appState.currentSheet,
           fields: {
             recipients: formData.recipients,
             mergeType: formData.mergetype,
-            mergeTitle: formData.mergetitle,
+            mergeTitle: formData.mergetitle || formData.mergeTitle,
             alias: formData.alias,
           },
+          recipients: formData.recipients,
+          mergeType: formData.mergetype,
+          mergeTitle: formData.mergetitle || formData.mergeTitle,
+          alias: formData.alias,
           draftId: appState.currentMerge.draftId,
           mergeId,
           attachments: email.attachments || [],
+          current: true
         });
+        console.log('merge wasnt found created new merge and attempted to clean up current merge on this sheet only')
+        console.log({ merges: appState.merges, currentMerge: appState.currentMerge })
+        // if other merges exist set their current status to false. The merge in this case refers to the mergeTitle 
+        // selected from the list of merge jobs in the header row.
+        appState.merges = appState.merges.map(merge => {
+          if (merge.currentSheet === appState.currentSheet && merge.mergeId === mergeId) {
+            return merge
+          } else if (merge.currentSheet === appState.currentSheet) {
+
+            return {
+              ...merge,
+              current: false,
+            }
+          }
+          return merge;
+        })
+        console.log('map complete')
+        console.log({ merges: appState.merges, currentMerge: appState.currentMerge })
+
       }
+
       // store the updated merges array in the script cache
+      // show the conditions UI
       google.script.run
         .withSuccessHandler(showMergeConditionsUI)
         .storeMailMerge({
@@ -723,12 +781,12 @@
         });
       // save the current email info to the app state, will use in the sendMerge Function
       appState.email = email;
-      // show the conditions UI
+      //TODO: replicate this if we end up on a later page in the process
     });
 
-    // -----------------------------------//
-    // Show the merge conditions -----------//
-    // -----------------------------------//
+    // ------------------------------------//
+    // Show the merge conditions ---------//
+    // ----------------------------------//
     function showMergeConditionsUI(data) {
       handleLoading(null, "cancel");
       const parentDiv = document.getElementById("conditions");
@@ -740,27 +798,32 @@
       parentDiv
         .querySelector("#add-condition")
         .addEventListener("click", (e) => {
+          console.log(e.target)
           handleAddInput();
         });
-      if (data && data.mergeConditions) {
-        const mergeConditions = JSON.parse(data.mergeConditions);
 
-        mergeConditions.forEach((condition) => {
-          if (
-            !existingMergeConditions.find(
-              (c) => parseFloat(c.id.split("-")[1]) == condition.id
-            )
-          ) {
-            createConditionInputGroup(
-              conditionsDiv,
-              condition.id,
-              condition.column,
-              condition.comparison,
-              condition.condition
-            );
-          }
-        });
+      const mergeConditions = appState.mergeConditions;
+
+      function filterConditionsBySheet(condition) {
+        return condition.currentSheet === appState.currentSheet;
       }
+
+      mergeConditions.filter(filterConditionsBySheet).forEach((condition) => {
+        if (
+          !existingMergeConditions.find(
+            (c) => parseFloat(c.id.split("-")[1]) == condition.id
+          )
+        ) {
+          createConditionInputGroup(
+            conditionsDiv,
+            condition.id,
+            condition.column,
+            condition.comparison,
+            condition.condition
+          );
+        }
+      });
+
       //   if(data.mergeConditions && data.mergeConditions.length){
       //   appState.mergeConditions = data.mergeConditions ? JSON.stringify(data.mergeConditions) : [];
       // }
@@ -779,11 +842,12 @@
       }
 
       function handleChange(e) {
-        const mergeCondition = appState.mergeConditions.find(
+        const mergeCondition = appState.mergeConditions.filter(filterConditionsBySheet).find(
           (condition) => condition.id == e.target.id.split("-")[1]
         );
         mergeCondition[e.target.name] = e.target.value;
-        console.log(mergeCondition, appState.mergeConditions)
+        mergeCondition.currentSheet = appState.currentSheet;
+
         google.script.run.storeMailMerge({
           mergeConditions: JSON.stringify(appState.mergeConditions),
         });
@@ -817,7 +881,7 @@
 
         const mergeConditionId = e.target.id.split("-")[1];
         const filteredMergeConditions = appState.mergeConditions.filter(
-          (condition) => condition.id != mergeConditionId
+          (condition) => condition.currentSheet === appState.currentSheet && condition.id != mergeConditionId
         );
         appState.mergeConditions = filteredMergeConditions;
         const mergeConditionContainer = conditionsDiv.querySelector(
@@ -836,7 +900,7 @@
         comparison = "",
         condition = ""
       ) {
-        console.log(comparison === 'TextEquals')
+
         parentDiv.insertAdjacentHTML(
           "beforeend",
           `
@@ -900,6 +964,7 @@
           id: mergeConditionId,
           condition: "",
           column: "",
+          currentSheet: appState.currentSheet,
         });
         // insert the merge condition into the document
         createConditionInputGroup(conditionsDiv, mergeConditionId);
@@ -963,6 +1028,12 @@
         // store results in the cache
         google.script.run.storeMailMerge({
           currentMerge: JSON.stringify(appState.currentMerge),
+          merges: JSON.stringify(appState.merges.map(merge => {
+            if (merge.mergeId === appState.currentMerge.mergeId) {
+              return appState.currentMerge;
+            }
+            return merge;
+          }))
         });
       }
 
@@ -991,6 +1062,12 @@
         // store custom Attachment info in the cache
         google.script.run.storeMailMerge({
           currentMerge: JSON.stringify(appState.currentMerge),
+          merges: JSON.stringify(appState.merges.map(merge => {
+            if (merge.mergeId === appState.currentMerge.mergeId) {
+              return appState.currentMerge;
+            }
+            return merge;
+          }))
         });
       }
 
@@ -998,6 +1075,12 @@
         appState.currentMerge.customAttachment.fileName = e.target.value;
         google.script.run.storeMailMerge({
           currentMerge: JSON.stringify(appState.currentMerge),
+          merges: JSON.stringify(appState.merges.map(merge => {
+            if (merge.mergeId === appState.currentMerge.mergeId) {
+              return appState.currentMerge;
+            }
+            return merge;
+          }))
         });
       }
       function handleToggleChange(e) {
@@ -1036,20 +1119,32 @@
           nextButton.disabled = false;
         }
         // store custom Attachment info in the cache
+        const updatedMerges = appState.merges.map(merge => {
+          if (merge.mergeId === appState.currentMerge.mergeId) {
+            return {
+              ...merge,
+              customAttachment: appState.currentMerge.customAttachment
+            }
+          }
+          return merge;
+        });
+        console.log({ updatedMerges, prevMerges: appState.merges })
         google.script.run.storeMailMerge({
           currentMerge: JSON.stringify(appState.currentMerge),
+          merges: JSON.stringify(updatedMerges)
         });
       }
 
       function updateInputs() {
-        customDocToggles.forEach((toggle) => {
-          toggle.value ===
-            appState.currentMerge.customAttachment.includeAttachment
-            ? (toggle.checked = true)
-            : (toggle.checked = false);
-        });
+
+        if (appState?.currentMerge?.customAttachment?.includeAttachment === 'yes') {
+
+          customDocToggles.forEach((toggle) => {
+            toggle.checked = appState.currentMerge?.customAttachment?.includeAttachment === toggle.value;
+          });
+        }
         if (
-          appState.currentMerge.customAttachment.includeAttachment === "yes"
+          appState?.currentMerge?.customAttachment?.includeAttachment === "yes"
         ) {
           const currentInputs = document.querySelectorAll(
             'input[id^="attachmentId"]'
@@ -1112,10 +1207,32 @@
 
     function showPreviewUI({ mergePreviewObject: previewObj, skipped, error, stack }) {
       console.log(previewObj, skipped, error, stack)
+
+      const previewContent = document.querySelector(".preview__output");
+      if (error || !previewObj) {
+        previewContent.insertAdjacentHTML(
+          "beforeend",
+          `
+            <span class="email-preview__whoops">\\(o_o)/</span>
+            <div class="email-preview__whoops">
+              <p>Whoops! It looks like there aren't any rows to merge. Make sure you have recipients to send to or check your merge status column.</p>
+              <p>Hint: If you need to resend a merge just delete the text in the merge status column for the recipient you wish to email again.</p>
+            </div>
+
+          `
+        );
+        const actionDiv = document.querySelector(".preview__action");
+        const nextButton = document.querySelector(".preview__action--next");
+        nextButton.parentElement.removeChild(nextButton);
+        const closeButtonHtml = `
+          <button onclick="google.script.host.close()" class="btn-primary close">Close</button>
+          `;
+        actionDiv.insertAdjacentHTML("beforeend", closeButtonHtml);
+        return;
+      }
       const messages = previewObj.mergePreview;
       const { attachments } = appState.currentMerge;
       const { remainingQuota } = previewObj;
-      const previewContent = document.querySelector(".preview__output");
       previewContent.innerHTML = "";
       appState.loadingTimeout = window.setTimeout(() => {
         // special case for if the back button is pressed before
@@ -1167,7 +1284,7 @@
         // previewContent is the preview div to dump the previews
         previewContent.innerHTML += `
           <h2>Message Previews - Attempting ${messages.length} merge${messages.length === 1 ? "" : "s"
-          } as ${appState.currentMerge.mergetype === "drafts" ? "drafts" : "emails"
+          } as ${appState.currentMerge.mergeType === "drafts" ? "drafts" : "emails"
           }</h2>
           <p>You have ${remainingQuota} messages left to send today.</p>
 
@@ -1283,15 +1400,6 @@
      *
      * */
 
-    /**
-     * @function navigate handles changing screens in app
-     * @param {string} command="next|prev" - go forward or backward a screen
-     */
-    function navigate(command = "next") {
-      // if moving forward, increment app state's page index
-      // if moving backward, decrement app state's page index
-    }
-
     function handleTransition(currEl, nextEl) {
       // hide current ui
       document.querySelector(`#${currEl}`).classList.toggle("ui-hidden");
@@ -1314,10 +1422,10 @@
         }
         return;
       }
-      // if (id === 'initial-ui') return;
+      // if (id === 'mergeOptions') return;
       parentDiv = document.getElementById("app");
       const loadingHTML = `
-          <div class="loading ${id === "initial-ui" ? "initial-ui" : ""}">
+          <div class="loading ${id === "mergeOptions" ? "mergeOptions" : ""}">
             <div class="container">
               <div class="box">
                 <div class="border one"></div>
@@ -1339,5 +1447,93 @@
 
       parentDiv.insertAdjacentHTML("afterend", loadingHTML);
     }
+
+    function initApp({ headers, aliases, drafts, currentSheet, mergeInfo }) {
+      // parse the necessary data
+      let mergeConditions = [];
+      let currentMerge = {
+        mergeTitle: "",
+        draftId: "",
+        mergeId: "",
+        attachments: [],
+        customAttachment: {
+          type: "",
+          includeAttachment: "no",
+          templateId: "",
+          fileName: "",
+        },
+      };
+      let merges = [];
+      try {
+        mergeConditions = mergeInfo.mergeConditions ? JSON.parse(mergeInfo.mergeConditions) : [];
+        merges = mergeInfo.merges ? JSON.parse(mergeInfo.merges) : [];
+        currentMerge = merges.find(merge => merge.current && merge.currentSheet === currentSheet) || currentMerge;
+        appState.currentMerge.attachments = typeof currentMerge.attachments === 'string' ? JSON.parse(currentMerge?.attachments || '[]') : [];
+      } catch (e) {
+        console.error(e)
+        mergeConditions = []
+        currentMerge = {}
+        merges = []
+      }
+      // set up the apps current state...
+      // need to check merges array for headers starting with merge status
+      const headings = headers.filter(
+        (header) => !header.startsWith("Merge Status - ")
+      );
+      const mergeTitles = headers.filter((header) =>
+        header.startsWith("Merge Status - ")
+      );
+
+      // filter out the valid merges for the sheet you're on
+      // mergeConditions = mergeConditions.filter(condition => condition.currentSheet === currentSheet);
+      appState.mergeTitles = mergeTitles;
+      appState.columnHeadings = headings;
+      appState.currentSheet = currentSheet;
+      appState.mergeConditions = mergeConditions;
+      appState.currentMerge = currentMerge;
+      appState.merges = merges;
+      // quick bit of housekeeping to make sure the app cache on both the local
+      // and Script side is current 
+      // appState.currentMerge.currentSheet = appState.currentMerge.currentSheet ?? currentSheet;
+      // appState.mergeConditions = mergeConditions.map((condition) => {
+      //   condition.currentSheet = condition.currentSheet ?? appState.currentSheet;
+      //   return condition;
+      // });
+      // update the necessary form on the merge options screen
+      console.log({ currentSheet, mergeInfo, appState })
+      updatePlaceholders(headings);
+      updateRecipients(headings);
+      // update Aliases
+      updateAliases(aliases);
+      // updateDraftMessages and render the correct start page
+      updateDraftMessages(drafts, mergeInfo);
+      showMergeTitles();
+      // depending on which page was requested initialize that UI
+      if (mergeInfo.startPage === "conditions") {
+        showMergeConditionsUI();
+      } else if (mergeInfo.startPage === "attachments") {
+        initAttachmentUI();
+      } else if (mergeInfo.startPage === "preview") {
+        handleLoading();
+        sendMerge('preview');
+      } else if (mergeInfo.startPage === "confirmation") {
+        handleLoading();
+        sendMerge('merge');
+      }
+    }
+    function start(page) {
+      // check script cache to see if any merge data has been saved which kicks off
+      // process of setting up the application.
+
+      google.script.run.withSuccessHandler(initApp).initApp();
+      handleLoading();
+      setStartPage(page);
+    }
+    function setStartPage(page) {
+
+      document.querySelector(`#${page}`).classList.toggle("ui-hidden");
+    }
+    google.script.run.withSuccessHandler(start).getStartPage();
+
   })();
 </script>

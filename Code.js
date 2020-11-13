@@ -7,18 +7,40 @@ const ss = SpreadsheetApp.getActiveSpreadsheet();
 function onInstall(e) {
   onOpen(e);
 }
+// utility function to test out what's stored in the script properties object
+// also provides a way to blow away the properties stored
+
+function propertiesTesting() {
+  // uncomment below to remove all properties from the properties service
+  let scriptProperties = PropertiesService.getScriptProperties();
+  let newProps = scriptProperties.deleteAllProperties();
+  let obj = newProps.getProperties();
+  for (key in obj) {
+    Logger.log(obj[key]);
+  }
+
+  // temp function to run some evaluations on properties service.
+  const properties = scriptProperties.getProperties();
+  for (key in properties) {
+    Logger.log(properties[key]);
+  }
+}
 function onOpen(e) {
   const menu = SpreadsheetApp.getUi().createMenu('Mail Merge');
   const authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
   if (e && e.authMode == ScriptApp.AuthMode.NONE) {
-    menu.addItem('Configure Merge', 'startingPageforStandardMerge');
+    menu.addItem('Configure merge options', 'startingPageforStandardMerge');
   } else {
     const properties = PropertiesService.getScriptProperties();
     const merges = properties.getProperty('merges');
     if (merges) {
-      menu.addItem('Configure Merge', 'startingPageforStandardMerge');
+      menu.addItem('Configure merge options', 'configureMergeOptions');
+      menu.addItem('Configure send conditions', 'configureMergeConditions');
+      menu.addItem('Configure custom attachment', 'configureCustomAttachment');
+      menu.addItem('Preview last merge', 'configureMergePreview');
+      menu.addItem('Re-run last merge', 'reRunMerge');
     } else {
-      menu.addItem('Configure Merge', 'startingPageforStandardMerge');
+      menu.addItem('Configure merge Options', 'startingPageforStandardMerge');
     }
   }
   menu.addSeparator().addItem('Get Help', 'helpPageForMerge');
@@ -142,11 +164,29 @@ function getMailMerge() {
   try {
     const scriptProperties = PropertiesService.getScriptProperties();
     const data = scriptProperties.getProperties();
-    return { data };
+    return data;
   } catch (e) {
     return { error: e };
   }
 }
+// ma
+function getHeaders() {
+  var dataSheet = ss.getActiveSheet();
+  var lastColumn = dataSheet.getLastColumn();
+  var headers = dataSheet.getRange(1, 1, 1, lastColumn).getValues();
+  return headers;
+}
+
+// function initApp gathers necessary data to hydrate the app with cached merge info
+function initApp() {
+  const headers = getHeaders();
+  const { aliases } = getAliases();
+  const drafts = getUserDrafts();
+  const currentSheet = SpreadsheetApp.getActiveSheet().getSheetId();
+  const mergeInfo = getMailMerge();
+  return { headers, aliases, drafts, currentSheet, mergeInfo }
+}
+
 // kind refers to either preview or merge
 function merge(
   kind,
@@ -155,15 +195,19 @@ function merge(
   recipientsHeader,
   mergeTitle,
   mergeConditions,
-  customAttachment
+  customAttachment,
+  currentDate
 ) {
   // if for some reason mergeTitle is not passed generate a random id for it
+  Logger.log('mergeTitle')
+  Logger.log(mergeTitle)
   if (!mergeTitle) {
     mergeTitle = uuid().slice(-5);
   }
   try {
     const draft = getDraft(email.id, kind);
     const dataSheet = ss.getActiveSheet();
+    const currentSheet = SpreadsheetApp.getActiveSheet().getSheetId();
     const headers = createMergeStatusHeadersIfNotFound([mergeTitle]);
     const dataRange = dataSheet.getDataRange();
     // inline the images
@@ -231,6 +275,26 @@ function merge(
         reason
       });
     }
+    // if custom attachment exists need to set up the parent folder to store the merge job for later
+    // only do this if mergeType is merge
+    if (customAttachment && kind === 'merge') {
+      // set up folder structure for custom docs when we process each row later
+      const templateFile = DriveApp.getFileById(customAttachment.templateId);
+      const folderIterator = templateFile.getParents();
+      let parentFolder;
+      while (folderIterator.hasNext()) {
+        const folder = folderIterator.next();
+        parentFolder = folder;
+      }
+      // create subfolder to keep the merged docs tidy
+
+      const customDocFolder = DriveApp.createFolder(`${customAttachment.originalFileName} merged docs on ${currentDate}`);
+      customDocFolder.moveTo(parentFolder);
+      // add to the customAttachment object for later use
+      customAttachment.templateFile = templateFile;
+      customAttachment.parentFolder = customDocFolder;
+    }
+    // loop through the row data to complete the preview or merge jobs
     const _loop_1 = function (i) {
       const rowData = objects[i];
       let status = '';
@@ -251,7 +315,8 @@ function merge(
 
 
           if (mergeConditions.length) {
-            mergeConditions.forEach(function (_a) {
+
+            mergeConditions.filter(c => c.currentSheet === currentSheet).forEach(function (_a) {
               // condition contains a column to check and what should be in the cell to match
               // the condition
               const { column, comparison } = _a; // column to be compared against and the comparison chosen
@@ -429,7 +494,8 @@ function merge(
               sendDrafts,
               emailColumn,
               headers,
-              customAttachment
+              customAttachment,
+              currentDate
             );
             if (messagePreview && kind === 'preview') {
               // just sending back a preview, no need to merge
@@ -499,7 +565,8 @@ function processRow(
   sendDrafts,
   emailColumn,
   headers,
-  customAttachment
+  customAttachment,
+  currentDate
 ) {
   // have to handle preview and merge html templates differently because
   // of the way images are handled in sending emails or creating drafts.
@@ -544,13 +611,13 @@ function processRow(
 
 
     var customPDF = generateCustomPDF(
-      customAttachment.type,
-      customAttachment.templateId,
+      customAttachment,
       headers,
       rowData,
-      customAttachment.fileName
     );
   }
+  Logger.log('sending drafts or emails')
+  Logger.log(sendDrafts)
   if (sendDrafts === 'drafts') {
     GmailApp.createDraft(emailTo, emailSubject, emailText, {
       ...mergeData,
@@ -596,11 +663,9 @@ function fillInTemplateFromObject(template, data) {
 // needs the template doc ID
 // will generate a PDF
 function generateCustomPDF(
-  templateType,
-  templateId,
+  { templateType, templateId, templateName, templateFile, parentFolder: customDocFolder },
   headers,
   mergeData,
-  templateName
 ) {
   templateType = templateType || 'application/vnd.google-apps.document';
   // Test Doc ID - 1evqsOl84cM_cdCx9ORmrv3O5HvG91w2YHl860xXxw8c
@@ -618,25 +683,11 @@ function generateCustomPDF(
       ? fillInTemplateFromObject(templateName, mergeData)
       : `${mergeData.firstName} ${mergeData.lastName} merge test`;
 
-  // need to open the template and get main slide
-  // need to get parent folder so we know where to create documents
-  // generate new presentation
-  // replace the placeholder text with template
-  // save as pdf
-  // return
-  const templateFile = DriveApp.getFileById(templateId);
-  const folderIterator = templateFile.getParents();
-  let parentFolder;
-  let parentFolderId = '';
-  while (folderIterator.hasNext()) {
-    const folder = folderIterator.next();
-    parentFolder = folder;
-    parentFolderId = folder.getId();
-  }
+
   // TODO: grab doc title sent from client
   const customPresentationFile = templateFile.makeCopy(
     newTemplateName,
-    parentFolder
+    customDocFolder
   );
 
   // check for file type, only support GOOGLE_DOCS and GOOGLE_SLIDES for now
