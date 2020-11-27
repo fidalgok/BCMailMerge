@@ -1030,7 +1030,7 @@
           currentMerge: JSON.stringify(appState.currentMerge),
           merges: JSON.stringify(appState.merges.map(merge => {
             if (merge.mergeId === appState.currentMerge.mergeId) {
-              return appState.currentMerge;
+              return { ...appState.currentMerge, ...merge };
             }
             return merge;
           }))
@@ -1064,7 +1064,7 @@
           currentMerge: JSON.stringify(appState.currentMerge),
           merges: JSON.stringify(appState.merges.map(merge => {
             if (merge.mergeId === appState.currentMerge.mergeId) {
-              return appState.currentMerge;
+              return { ...appState.currentMerge, ...merge };
             }
             return merge;
           }))
@@ -1077,7 +1077,7 @@
           currentMerge: JSON.stringify(appState.currentMerge),
           merges: JSON.stringify(appState.merges.map(merge => {
             if (merge.mergeId === appState.currentMerge.mergeId) {
-              return appState.currentMerge;
+              return { ...appState.currentMerge, ...merge };
             }
             return merge;
           }))
