@@ -680,7 +680,7 @@ function fillInTemplateFromObject(template, data) {
 // needs the template doc ID
 // will generate a PDF
 function generateCustomPDF(
-  { templateType, templateId, templateName, templateFile, parentFolder: customDocFolder },
+  { templateType, templateId, templateName, templateFile, parentFolder: customDocFolder, ...template },
   headers,
   mergeData,
 ) {
@@ -698,7 +698,7 @@ function generateCustomPDF(
   const newTemplateName =
     templateName && templateName.trim().length > 0
       ? fillInTemplateFromObject(templateName, mergeData)
-      : `${mergeData.firstName} ${mergeData.lastName} merge test`;
+      : `${template.originalFileName}`;
 
 
   // TODO: grab doc title sent from client
