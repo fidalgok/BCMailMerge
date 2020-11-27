@@ -289,10 +289,27 @@ function merge(
       // create subfolder to keep the merged docs tidy
 
       const customDocFolder = DriveApp.createFolder(`${customAttachment.originalFileName} merged docs on ${currentDate}`);
-      customDocFolder.moveTo(parentFolder);
+      try {
+        // works for standard drives
+        customDocFolder.moveTo(parentFolder);
+        customAttachment.parentFolder = customDocFolder;
+      } catch (e) {
+        // remove created folder first
+        customDocFolder.setTrashed(true);
+        // works for all drive types including shared drives
+        var optionalArgs = { supportsAllDrives: true };
+        var resource = {
+          title: `${customAttachment.originalFileName} merged docs on ${currentDate}`,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [{
+            "id": parentFolder.getId()
+          }]
+        }
+        const newParentFolder = Drive.Files.insert(resource, null, optionalArgs);
+        customAttachment.parentFolder = DriveApp.getFolderById(newParentFolder.id);
+      }
       // add to the customAttachment object for later use
       customAttachment.templateFile = templateFile;
-      customAttachment.parentFolder = customDocFolder;
     }
     // loop through the row data to complete the preview or merge jobs
     const _loop_1 = function (i) {
