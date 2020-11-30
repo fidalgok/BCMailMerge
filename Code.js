@@ -633,8 +633,7 @@ function processRow(
       rowData,
     );
   }
-  Logger.log('sending drafts or emails')
-  Logger.log(sendDrafts)
+
   if (sendDrafts === 'drafts') {
     GmailApp.createDraft(emailTo, emailSubject, emailText, {
       ...mergeData,

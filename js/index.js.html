@@ -616,7 +616,7 @@
         if (merge && merge.fields) {
           for (field in merge.fields) {
             const el = document.querySelector(
-              `[name="${field.toLowerCase()}"]`
+              `[name="${field}"]`
             );
             if (!el) continue;
             if (el.type === "radio") {
@@ -709,7 +709,7 @@
           if (merge.mergeId === mergeId) {
             merge.fields = {
               recipients: formData.recipients,
-              mergeType: formData.mergetype,
+              mergeType: formData.mergeType,
               mergeTitle: formData.mergetitle || formData.mergeTitle,
               alias: formData.alias,
             };
@@ -719,7 +719,7 @@
             merge.currentSheet = appState.currentSheet;
             merge.current = true;
             merge.recipients = formData.recipients;
-            merge.mergeType = formData.mergetype || formData.mergeType;
+            merge.mergeType = formData.mergeType;
             merge.mergeTitle = formData.mergeTitle;
             merge.alias = formData.alias;
             return merge;
@@ -737,12 +737,12 @@
           currentSheet: appState.currentSheet,
           fields: {
             recipients: formData.recipients,
-            mergeType: formData.mergetype,
+            mergeType: formData.mergeType,
             mergeTitle: formData.mergetitle || formData.mergeTitle,
             alias: formData.alias,
           },
           recipients: formData.recipients,
-          mergeType: formData.mergetype,
+          mergeType: formData.mergeType,
           mergeTitle: formData.mergetitle || formData.mergeTitle,
           alias: formData.alias,
           draftId: appState.currentMerge.draftId,
