@@ -1449,6 +1449,12 @@
     }
 
     function initApp({ headers, aliases, drafts, currentSheet, mergeInfo }) {
+      // Because of a race condition for checking for multiple users we have to check if the error div exists before proceeding
+      // check to see if error div exists from initial check using a scriptlet on the html template file
+      // that check runs to see if there are multiple users logged in at the same time in the same browser
+      // which throws errors and inconsistencies for certain functions.
+      const errorMessage = document.getElementById('errorContainer');
+      if (errorMessage) return handleLoading(null, 'cancel'); // bail, no need to continue
       // parse the necessary data
       let mergeConditions = [];
       let currentMerge = {
@@ -1504,6 +1510,8 @@
       updateDraftMessages(drafts, mergeInfo);
       showMergeTitles();
       // depending on which page was requested initialize that UI
+
+      setStartPage(appState.startPage || 'startPage');
       if (mergeInfo.startPage === "conditions") {
         showMergeConditionsUI();
       } else if (mergeInfo.startPage === "attachments") {
@@ -1519,35 +1527,19 @@
     function start(page) {
       // check script cache to see if any merge data has been saved which kicks off
       // process of setting up the application.
-      // check to see if error div exists from initial check using a scriptlet on the html template file
-      // that check runs to see if there are multiple users logged in at the same time in the same browser
-      // which throws errors and inconsistencies for certain functions.
+      // Because of a race condition I'm calling this in two places. here and in initApp. One of these catches the issue before the user sees it
       const errorMessage = document.getElementById('errorContainer');
-      if (errorMessage) return; // bail
+      if (errorMessage) return
       google.script.run.withSuccessHandler(initApp).initApp();
       handleLoading();
-      setStartPage(page);
+      appState.startPage = page;
     }
     function setStartPage(page) {
 
       document.querySelector(`#${page}`).classList.toggle("ui-hidden");
     }
-    function failedCall(error) {
-      // if this gets called then we know it's a permissions issue from the first call to google.script.run
-      let permissionError = false;
-      const message = error.message;
-      permissionError = permissionError !== true ? message.toLowerCase().includes('permission_denied') : true;
-      permissionError = permissionError !== true ? message.toLowerCase().includes('required to perform that action') : true;
-      if (permissionError) {
-        const template = document.querySelector('#permissionError');
-        const appContainer = document.querySelector('#app');
-        const clone = template.content.firstElementChild.cloneNode(true);
-        appContainer.appendChild(clone);
-      }
 
-
-    }
-    google.script.run.withSuccessHandler(start).withFailureHandler(failedCall).getStartPage();
+    google.script.run.withSuccessHandler(start).getStartPage();
 
   })();
 </script>
