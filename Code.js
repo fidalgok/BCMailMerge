@@ -626,7 +626,6 @@ function processRow(
   if (customAttachment) {
     // request to create custom attachment(s)
 
-
     var customPDF = generateCustomPDF(
       customAttachment,
       headers,

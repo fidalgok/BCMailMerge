@@ -275,6 +275,63 @@
       <div id="confirmation__content"></div>
     </div>
   </div>
+
+  <!-- Template for showing errors-->
+  <template id="permissionError">
+    <div id="errorContainer">
+      <div id="errorName">
+        <p>A script error has occured!</p>
+      </div>
+      <div id="errorMessage">
+        <p>This script lacks authorization to run properly.</p>
+        <p>If you are logged into multiple Google accounts in the same browser.
+          Please log out of all accounts and only log back into one account to run the mail merge. If you're
+          only logged into one account, close this dialog and try again.
+        </p>
+      </div>
+    </div>
+  </template>
+  <?
+  // quick check to see if user permissions match up or not.
+  var initiator = Session.getEffectiveUser().getEmail();
+
+  ?>
+  <script>
+    // check to see if users match up here
+    function failedCall(error) {
+      // if this gets called then we know it's a user account issue from multiple accounts being signed in at the same time
+      // or it's an authorization issue due to multiple accounts being logged into and only one has authorized the app that isn't the primary account
+
+      let permissionError = false;
+      const message = error.message;
+      permissionError = permissionError !== true ? message.toLowerCase().includes('permission_denied') : true;
+      permissionError = permissionError !== true ? message.toLowerCase().includes('required to perform that action') : true;
+      const template = document.querySelector('#permissionError');
+      const appContainer = document.querySelector('#app');
+      const clone = template.content.firstElementChild.cloneNode(true);
+
+      if (permissionError) {
+
+
+        appContainer.appendChild(clone);
+      }
+
+      if (message.includes('Multiple accounts issue')) {
+        // made it past the first account permissions check
+        let messageNode = clone.querySelector('#errorMessage');
+        messageNode.innerHTML = message;
+        appContainer.appendChild(clone);
+      }
+    }
+    function checkUsers(error) {
+      console.log(error);
+      console.dir(error);
+      if (error?.message) {
+        failedCall(error);
+      }
+    }
+    google.script.run.withSuccessHandler(checkUsers).withFailureHandler(checkUsers).checkMultipleAccountIssue(<?= initiator ?>)
+  </script>
   <?!= include('js/index.js.html'); ?>
 </body>
 

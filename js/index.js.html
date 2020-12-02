@@ -752,7 +752,7 @@
         });
         console.log('merge wasnt found created new merge and attempted to clean up current merge on this sheet only')
         console.log({ merges: appState.merges, currentMerge: appState.currentMerge })
-        // if other merges exist set their current status to false. The merge in this case refers to the mergeTitle 
+        // if other merges exist set their current status to false. The merge in this case refers to the mergeTitle
         // selected from the list of merge jobs in the header row.
         appState.merges = appState.merges.map(merge => {
           if (merge.currentSheet === appState.currentSheet && merge.mergeId === mergeId) {
@@ -1519,7 +1519,11 @@
     function start(page) {
       // check script cache to see if any merge data has been saved which kicks off
       // process of setting up the application.
-
+      // check to see if error div exists from initial check using a scriptlet on the html template file
+      // that check runs to see if there are multiple users logged in at the same time in the same browser
+      // which throws errors and inconsistencies for certain functions.
+      const errorMessage = document.getElementById('errorContainer');
+      if (errorMessage) return; // bail
       google.script.run.withSuccessHandler(initApp).initApp();
       handleLoading();
       setStartPage(page);
@@ -1528,7 +1532,22 @@
 
       document.querySelector(`#${page}`).classList.toggle("ui-hidden");
     }
-    google.script.run.withSuccessHandler(start).getStartPage();
+    function failedCall(error) {
+      // if this gets called then we know it's a permissions issue from the first call to google.script.run
+      let permissionError = false;
+      const message = error.message;
+      permissionError = permissionError !== true ? message.toLowerCase().includes('permission_denied') : true;
+      permissionError = permissionError !== true ? message.toLowerCase().includes('required to perform that action') : true;
+      if (permissionError) {
+        const template = document.querySelector('#permissionError');
+        const appContainer = document.querySelector('#app');
+        const clone = template.content.firstElementChild.cloneNode(true);
+        appContainer.appendChild(clone);
+      }
+
+
+    }
+    google.script.run.withSuccessHandler(start).withFailureHandler(failedCall).getStartPage();
 
   })();
 </script>

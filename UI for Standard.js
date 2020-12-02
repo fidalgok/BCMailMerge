@@ -3,6 +3,31 @@ var exports = exports || {};
 var module = module || { exports: exports };
 var exports = exports || {};
 var module = module || { exports: exports };
+function checkMultipleAccountIssue(initiator) {
+    const userEmailAddress = Session.getEffectiveUser().getEmail();
+    let error = null;
+    if (initiator) {
+        // check if effective user matches the initiator (the account who triggered the display of the UI)
+        // Due to a Google bug, if user is connected with multiple accounts inside the same browser session
+        // google.script.run can be executed by another account than the initiator
+        if (initiator != userEmailAddress) {
+            Logger.log({
+                message: "Client side calls initiated from wrong account",
+                initiator: initiator,
+                effectiveUser: userEmailAddress
+            });
+            let errorMessage = "Multiple accounts issue.<br>";
+            errorMessage += "Please log out of your account " + userEmailAddress;
+            errorMessage += " to use BC Mail Merge with the account " + initiator;
+            error = {
+                initiator,
+                userEmailAddress,
+                message: errorMessage,
+            }
+        }
+    }
+    return error;
+}
 function setStartingPage(page) {
 
     const properties = PropertiesService.getScriptProperties();
