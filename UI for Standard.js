@@ -1,8 +1,7 @@
 // Compiled using ts2gas 1.6.2 (TypeScript 3.6.4)
 var exports = exports || {};
 var module = module || { exports: exports };
-var exports = exports || {};
-var module = module || { exports: exports };
+
 function checkMultipleAccountIssue(initiator) {
     const userEmailAddress = Session.getEffectiveUser().getEmail();
     let error = null;

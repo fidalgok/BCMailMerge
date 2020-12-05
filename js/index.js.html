@@ -335,18 +335,38 @@
           updateDraftPreview();
           return;
         }
-        appState.currentMerge.draftId =
-          e.target.selectedOptions[0].dataset.mergeid;
+        const selectedDraftId = e.target.selectedOptions[0].dataset.draftid;
+        appState.currentMerge.draftId = selectedDraftId;
+        appState.merges = appState.merges.map(merge => {
+          if (merge.mergeId === appState.currentMerge.mergeId) {
+            return appState.currentMerge;
+          }
+          return merge;
+        });
+
         google.script.run.withSuccessHandler(logScriptCache).storeMailMerge({
           currentMerge: JSON.stringify(appState.currentMerge),
-          merges: JSON.stringify(appState.merges.map(merge => {
-            if (merge.mergeId === appState.currentMerge.mergeId) {
-              return appState.currentMerge;
-            }
-            return merge;
-          }))
+          merges: JSON.stringify(appState.merges)
         });
-        updateDraftPreview();
+        //TODO: update the draftpreview with the selected message
+        function mergeDrafts(draft) {
+          if (draft.error) return console.dir(error);
+          appState.drafts = appState.drafts.map(d => {
+            if (d.id === draft.id) {
+              return {
+                ...d,
+                ...draft
+              }
+            }
+            return d;
+          })
+          updateDraftPreview(draft);
+        }
+        google.script.run.withSuccessHandler(mergeDrafts).getDraftBody({
+          ...appState.drafts.find(draft => draft.id === selectedDraftId)
+        });
+
+
         return;
       }
       if (hasError) return;
@@ -517,7 +537,7 @@
         console.error(error.stack);
         return;
       }
-      appState.drafts = drafts;
+
       const draftSelect = document.querySelector("#userdrafts");
 
       // remove all options also handles refresh case
@@ -535,7 +555,7 @@
         const option = document.createElement("option");
         option.text = draft.subject || `No subject for draft ${idx + 1}`;
         option.value = draft.subject || `No subject for draft ${idx + 1}`;
-        option.setAttribute("data-mergeid", draft.id);
+        option.setAttribute("data-draftId", draft.id);
         draftSelect.add(option);
       });
       // should have all data now to set up the form... don't refresh everything if user is just refreshing drafts
@@ -544,11 +564,13 @@
       if (refresh) {
         // reselect the current draft if one was selected before
         const el = document.querySelector(
-          `[data-mergeId="${appState.currentMerge.draftId}"]`
+          `[data-draftId="${appState.currentMerge.draftId}"]`
         );
         if (el) {
           el.selected = true;
-          updateDraftPreview();
+          //TODO: change to go get this specific draft's body for the preview
+          const draft = appState.drafts.find(d => d.id === appState.currentMerge.draftId)
+          google.script.run.withSuccessHandler(updateDraftPreview).getDraftBody(draft);
         }
         // update the loading state of the button
         refreshDraftsButton.setAttribute("data-loading", "false");
@@ -558,10 +580,8 @@
       }
     }
 
-    function updateDraftPreview() {
-      const draft = appState.drafts.find(
-        (draft) => draft.id === appState.currentMerge.draftId
-      );
+    function updateDraftPreview(draft) {
+
       if (!draft) {
         // clear out the preview if the draft wasn't found
         const draftPreview = [
@@ -635,11 +655,12 @@
         // create the select for drafts and set the selected option of the draftId from the last run merge
 
         const el = document.querySelector(
-          `[data-mergeId="${appState.currentMerge.draftId}"]`
+          `[data-draftId="${appState.currentMerge.draftId}"]`
         );
         if (el) {
           el.selected = true;
-          updateDraftPreview();
+          const draft = appState.drafts.find(d => d.id === appState.currentMerge.draftId)
+          google.script.run.withSuccessHandler(updateDraftPreview).getDraftBody(draft);
         }
       }
 
@@ -766,8 +787,7 @@
           }
           return merge;
         })
-        console.log('map complete')
-        console.log({ merges: appState.merges, currentMerge: appState.currentMerge })
+
 
       }
 
@@ -1448,7 +1468,8 @@
       parentDiv.insertAdjacentHTML("afterend", loadingHTML);
     }
 
-    function initApp({ headers, aliases, drafts, currentSheet, mergeInfo }) {
+    function initApp({ headers, aliases, drafts, currentSheet, mergeInfo, error }) {
+      console.log(error)
       // Because of a race condition for checking for multiple users we have to check if the error div exists before proceeding
       // check to see if error div exists from initial check using a scriptlet on the html template file
       // that check runs to see if there are multiple users logged in at the same time in the same browser
@@ -1483,6 +1504,7 @@
       }
       // set up the apps current state...
       // need to check merges array for headers starting with merge status
+
       const headings = headers.filter(
         (header) => !header.startsWith("Merge Status - ")
       );
@@ -1499,9 +1521,10 @@
       appState.currentMerge = currentMerge;
       appState.currentMerge.currentSheet = currentSheet;
       appState.merges = merges;
+      appState.drafts = drafts.drafts;
 
       // update the necessary form on the merge options screen
-      console.log({ currentSheet, mergeInfo, appState })
+      // console.log({ currentSheet, mergeInfo, appState })
       updatePlaceholders(headings);
       updateRecipients(headings);
       // update Aliases
@@ -1527,7 +1550,8 @@
     function start(page) {
       // check script cache to see if any merge data has been saved which kicks off
       // process of setting up the application.
-      // Because of a race condition I'm calling this in two places. here and in initApp. One of these catches the issue before the user sees it
+      // Because of a race condition I'm calling this in two places. here and in initApp.
+      // One of these catches the issue before the user sees it
       const errorMessage = document.getElementById('errorContainer');
       if (errorMessage) return
       google.script.run.withSuccessHandler(initApp).initApp();

@@ -596,6 +596,19 @@
     pointer-events: none;
   }
 
+  #errorContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: grid;
+    height: 100vh;
+    width: 100vw;
+    place-items: center center;
+    pointer-events: none;
+    background: white;
+    z-index: 100;
+  }
+
   div#app+.loading {
     background: white;
   }

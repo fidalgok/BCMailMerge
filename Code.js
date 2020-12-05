@@ -1,7 +1,4 @@
-var exports = exports || {};
-var module = module || { exports };
-var exports = exports || {};
-var module = module || { exports };
+
 const ss = SpreadsheetApp.getActiveSpreadsheet();
 // currently attached spreadsheet https://docs.google.com/spreadsheets/d/1xNCrpcp7Z_gu0YANrNeRsPPIBr2KYdNaGKLU2H9pQW8
 function onInstall(e) {
@@ -98,35 +95,15 @@ function verifyTemplateId({ templateId, elementId }) {
   }
 }
 function getUserDrafts(refresh) {
-  if (refresh === void 0) {
-    refresh = false;
-  }
+  refresh = refresh || false;
   try {
     const drafts = GmailApp.getDrafts();
     let messages = drafts.map(function (draft) {
       // get attachments info separately
       const message = draft.getMessage();
-      const attachments = getMessageAttachments(message);
-      const attachmentNames = attachments.attachments.map(function (attachment) {
-        return attachment.name;
-      });
-      const rawContent = message.getRawContent();
-      const body = message.getBody();
-      const inlineImages = attachments.images.length
-        ? getInlinedImages(rawContent, attachments.images)
-        : [];
-      const htmlBody = inlineImages.length
-        ? inlineImagesInEmailBody(body, inlineImages)
-        : body;
       return {
-        to: message.getTo(),
-        cc: message.getCc(),
-        bcc: message.getBcc(),
-        attachments: attachmentNames,
         subject: message.getSubject(),
-        body: htmlBody,
         id: draft.getId(),
-        originalBody: body,
       };
     });
     if (messages.length === 0) {
@@ -140,6 +117,33 @@ function getUserDrafts(refresh) {
       refresh,
     };
   }
+}
+function getDraftBody({ id, subject }) {
+
+  const draft = GmailApp.getDraft(id);
+  const message = draft.getMessage();
+  const attachments = getMessageAttachments(message);
+  const attachmentNames = attachments.attachments.map(function (attachment) {
+    return attachment.name;
+  });
+  const rawContent = message.getRawContent();
+  const body = message.getBody();
+  const inlineImages = attachments.images.length
+    ? getInlinedImages(rawContent, attachments.images)
+    : [];
+  const htmlBody = inlineImages.length
+    ? inlineImagesInEmailBody(body, inlineImages)
+    : body;
+  return {
+    to: message.getTo(),
+    cc: message.getCc(),
+    bcc: message.getBcc(),
+    attachments: attachmentNames,
+    id,
+    subject,
+    body: htmlBody,
+    originalBody: body,
+  };
 }
 function getRemainingDailyQuota() {
   const remainingQuota = MailApp.getRemainingDailyQuota();
@@ -169,7 +173,7 @@ function getMailMerge() {
     return { error: e };
   }
 }
-// ma
+
 function getHeaders() {
   var dataSheet = ss.getActiveSheet();
   var lastColumn = dataSheet.getLastColumn();
@@ -181,10 +185,35 @@ function getHeaders() {
 function initApp() {
   const headers = getHeaders();
   const { aliases } = getAliases();
-  const drafts = getUserDrafts();
   const currentSheet = SpreadsheetApp.getActiveSheet().getSheetId();
   const mergeInfo = getMailMerge();
-  return { headers, aliases, drafts, currentSheet, mergeInfo }
+  const drafts = getUserDrafts();
+  //TODO: map over mergeInfo merges to find if there is
+  // a current draft selected from a previous merge and
+  // return just that body for the draft preview. Add it to
+  // the drafts array
+  try {
+    let parsedMerges = mergeInfo.merges ? JSON.parse(mergeInfo.merges) : [];
+    let currentMerge = parsedMerges.find(merge => merge.currentSheet === currentSheet && merge.current);
+    const matched = currentMerge ? drafts.drafts.find(draft => currentMerge.draftId === draft.id) : false;
+    if (matched) {
+
+      drafts.drafts = drafts.drafts.map(draft => {
+        if (draft.id === matched.id) {
+          return getDraftBody(matched);
+        }
+        return draft;
+      })
+    }
+
+  } catch (e) {
+    return {
+      error: {
+        message: e.message
+      }
+    }
+  }
+  return { headers, aliases, drafts, currentSheet, mergeInfo, error: null }
 }
 
 // kind refers to either preview or merge
@@ -199,8 +228,7 @@ function merge(
   currentDate
 ) {
   // if for some reason mergeTitle is not passed generate a random id for it
-  Logger.log('mergeTitle')
-  Logger.log(mergeTitle)
+
   if (!mergeTitle) {
     mergeTitle = uuid().slice(-5);
   }
