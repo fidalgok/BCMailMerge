@@ -280,6 +280,7 @@ function merge(
     }
     const emailColumn = normalizeHeader(recipientsHeader);
     const mergeStatus = normalizeHeader(`Merge Status - ${mergeTitle}`);
+    Logger.log(`normalized merge status: ${mergeStatus}`)
     const objects = getRowsData(dataRange);
     const mergeInfo = {
       type: sendDrafts === 'drafts' ? 'drafts' : 'emails',
@@ -722,8 +723,8 @@ function generateCustomPDF(
   };
   // make sure template name exists and isn't blank
   const newTemplateName =
-    templateName && templateName.trim().length > 0
-      ? fillInTemplateFromObject(templateName, mergeData)
+    template.fileName && template.fileName.trim().length > 0
+      ? fillInTemplateFromObject(template.fileName, mergeData)
       : `${template.originalFileName}`;
 
 

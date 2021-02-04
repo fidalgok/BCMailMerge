@@ -34,7 +34,7 @@ function getObjects(data, keys) {
         var hasData = false;
         for (var j = 0; j < data[i].length; ++j) {
             var cellData = data[i][j];
-            Logger.log({ cellData, type: typeof cellData, header: keys[j] })
+            // Logger.log({ cellData, type: typeof cellData, header: keys[j] })
             if (isCellEmpty(cellData)) {
                 // might not need this?
                 // object[keys[j]] = '';
@@ -47,7 +47,7 @@ function getObjects(data, keys) {
             objects.push(object);
         }
     }
-    Logger.log(objects)
+    //Logger.log(objects)
     return objects;
 }
 // Returns an Array of normalized Strings.
